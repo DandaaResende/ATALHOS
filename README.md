@@ -2,8 +2,6 @@
 
 **Atalhos** é uma plataforma inteligente de mobilidade urbana que utiliza agentes de Inteligência Artificial para ajudar passageiros a planejar seus deslocamentos no transporte público.
 
-Por meio de uma interação em linguagem natural, o usuário pode informar seu destino, suas preferências e suas necessidades. A plataforma analisa as informações disponíveis e recomenda alternativas de trajeto personalizadas.
-
 > **Mais do que indicar caminhos, queremos ajudar cada passageiro a decidir como chegar ao seu destino.**
 
 ---
@@ -18,11 +16,13 @@ Tornar o transporte público mais acessível, previsível e fácil de utilizar, 
 - **Interação por linguagem natural:** permite que o usuário faça solicitações de maneira simples e conversacional.
 - **Informações contextualizadas:** consulta uma base de conhecimento sobre linhas, itinerários e funcionamento do transporte público.
 - **Recomendações personalizadas:** avalia diferentes alternativas para indicar opções adequadas à realidade do usuário.
-- **Avaliações de viagens e motoristas:** permite registrar avaliações vinculadas ao número do veículo e à data e horário do percurso.
+- **Avaliações de veículos e motoristas:** permite registrar avaliações vinculadas ao número do veículo e à data e horário do percurso.
 
 ## Inteligência Artificial
 
 A solução utiliza uma arquitetura **multi-agente**, na qual diferentes agentes especializados colaboram para interpretar solicitações, consultar informações e avaliar alternativas de deslocamento.
+
+## tecnologias utilizadas
 
 | Tecnologia | Aplicação |
 |---|---|
@@ -30,6 +30,7 @@ A solução utiliza uma arquitetura **multi-agente**, na qual diferentes agentes
 | **Groq** | Plataforma de inferência utilizada para executar modelos de linguagem com baixa latência. |
 | **RAG** | Técnica que permite consultar uma base de conhecimento antes de gerar respostas, fornecendo informações mais contextualizadas. |
 | **Python** | Desenvolvimento e integração das funcionalidades de IA e processamento de dados. |
+| **API** | Comunicação entre frontend e backend, possibilitando o envio e recebimento de informações. |
 
 
 ## Visão geral da arquitetura
@@ -55,12 +56,6 @@ A solução utiliza uma arquitetura **multi-agente**, na qual diferentes agentes
       │ RAG          │   │ SQLite       │
       └──────────────┘   └──────────────┘
 ```
-
-## Nosso diferencial
-
-Enquanto soluções convencionais se concentram em indicar rotas, o **Atalhos** busca auxiliar o passageiro na tomada de decisão.
-
-A plataforma considera que cada pessoa possui necessidades diferentes e que o melhor trajeto nem sempre é simplesmente o mais curto.
 
 ## Impacto esperado
 
@@ -89,7 +84,7 @@ A plataforma considera que cada pessoa possui necessidades diferentes e que o me
 ### 🎨 Design
 
 - [ ] Definição da identidade visual e linguagem gráfica.
-- [ ] Pesquisa com usuários e levantamento de necessidades.
+- [x] Pesquisa com usuários e levantamento de necessidades.
 - [ ] Definição das personas e jornadas dos passageiros.
 - [ ] Mapeamento dos fluxos de navegação.
 - [ ] Criação dos wireframes.
