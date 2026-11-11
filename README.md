@@ -1,4 +1,4 @@
-# 🚌 Atalhos — O aplicativo que encurta seu percurso
+# 🚌 Atalhos - O aplicativo que encurta seu percurso
 
 **Atalhos** é uma plataforma inteligente de mobilidade urbana que utiliza agentes de Inteligência Artificial para ajudar passageiros a planejar seus deslocamentos no transporte público.
 
@@ -123,35 +123,6 @@ flowchart TD
 - Facilidade de acesso às informações do transporte público.
 - Recomendações mais adequadas às necessidades individuais.
 - Melhoria na experiência de utilização do transporte coletivo.
-
----
-
-<details>
-<summary>📋 Entregas e atividades por área (CC e Design)</summary>
-
-### 💻 Ciência da Computação (CC)
-
-- [ ] Definição da arquitetura geral do sistema.
-- [ ] Estruturação do backend e das APIs.
-- [ ] Modelagem e implementação do banco de dados.
-- [ ] Desenvolvimento e integração dos agentes de IA.
-- [ ] Implementação da estratégia RAG e da base de conhecimento.
-- [ ] Integração entre frontend, backend e serviços de IA.
-- [ ] Testes das funcionalidades e integração.
-- [ ] Documentação técnica e instruções de execução.
-
-### 🎨 Design
-
-- [ ] Definição da identidade visual e linguagem gráfica.
-- [x] Pesquisa com usuários e levantamento de necessidades.
-- [ ] Definição das personas e jornadas dos passageiros.
-- [ ] Mapeamento dos fluxos de navegação.
-- [ ] Criação dos wireframes.
-- [ ] Desenvolvimento do protótipo de alta fidelidade.
-- [ ] Definição dos componentes e padrões visuais.
-- [ ] Testes de usabilidade e validação da experiência.
-
-</details>
 
 ---
 
