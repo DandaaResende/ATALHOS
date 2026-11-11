@@ -1,0 +1,36 @@
+﻿
+# Ambiente virtual
+.venv/
+venv/
+env/
+
+# Vari├íveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Arquivos temporários do Python
+__pycache__/
+*.py[cod]
