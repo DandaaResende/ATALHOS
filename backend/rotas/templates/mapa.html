@@ -1,0 +1,125 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atalhos - Mapa de Mobilidade</title>
+
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+
+        header {
+            padding: 18px;
+            background: #2e7d32;
+            color: white;
+        }
+
+        h1 {
+            margin: 0;
+        }
+
+        #mapa {
+            height: 80vh;
+            width: 100%;
+        }
+
+        .controles {
+            padding: 15px;
+            background: white;
+        }
+
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        button {
+            background: #2e7d32;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Atalhos</h1>
+        <p>Sua mobilidade, de um jeito mais simples.</p>
+    </header>
+
+    <div class="controles">
+        <label for="linha">Código da linha:</label>
+        <input id="linha" value="013">
+        <button onclick="carregarLinha()">Buscar linha</button>
+        <p id="mensagem">Carregando mapa...</p>
+    </div>
+
+    <div id="mapa"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        const mapa = L.map('mapa').setView([-8.05, -34.9], 12);
+
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(mapa);
+
+        let trajeto = null;
+
+        async function carregarLinha() {
+            const codigo = document.getElementById('linha').value;
+            const mensagem = document.getElementById('mensagem');
+
+            mensagem.textContent = 'Buscando itinerário...';
+
+            try {
+                const resposta = await fetch(
+                    `/rotas/api/linhas/${codigo}/itinerario/`
+                );
+
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.erro);
+                }
+
+                if (trajeto) {
+                    mapa.removeLayer(trajeto);
+                }
+
+                const pontos = dados.coordenadas.map(ponto => [
+                    ponto.latitude,
+                    ponto.longitude
+                ]);
+
+                trajeto = L.polyline(pontos, {
+                    color: '#2e7d32',
+                    weight: 5
+                }).addTo(mapa);
+
+                mapa.fitBounds(trajeto.getBounds());
+
+                mensagem.textContent =
+                    `Linha ${dados.linha} - ${dados.nome}`;
+
+            } catch (erro) {
+                mensagem.textContent = erro.message;
+            }
+        }
+
+        carregarLinha();
+    </script>
+
+</body>
+</html>
