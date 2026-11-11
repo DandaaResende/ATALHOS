@@ -25,13 +25,18 @@ A solução utiliza uma arquitetura **multi-agente**, na qual diferentes agentes
 ### Fluxo de funcionamento do agente de IA
 
 O agente do Atalhos recebe solicitações em linguagem natural, identifica as necessidades do passageiro, consulta informações sobre o transporte público e apresenta recomendações personalizadas.
-
+<details>
 #### Inputs (Entradas)
-
+</details>
+    
+<details>
 #### Processamento (Lógica)
-
+</details>
+    
+<details>
 #### Outputs (Saídas)
-
+</details>
+    
 ### Diagrama do fluxo
 
 ```mermaid
