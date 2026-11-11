@@ -22,22 +22,50 @@ Tornar o transporte público mais acessível, previsível e fácil de utilizar, 
 
 A solução utiliza uma arquitetura **multi-agente**, na qual diferentes agentes especializados colaboram para interpretar solicitações, consultar informações e avaliar alternativas de deslocamento.
 
+
 ### Fluxo de funcionamento do agente de IA
 
 O agente do Atalhos recebe solicitações em linguagem natural, identifica as necessidades do passageiro, consulta informações sobre o transporte público e apresenta recomendações personalizadas.
+
 <details>
-#### Inputs (Entradas)
+<summary>Inputs (Entradas)</summary>
+
+Informações fornecidas pelo usuário:
+
+- Origem e destino.
+- Horário desejado.
+- Preferências de deslocamento.
+- Necessidades específicas de mobilidade.
+
 </details>
-    
+
 <details>
-#### Processamento (Lógica)
+<summary>Processamento (Lógica)</summary>
+
+1. **Interpretação:** identifica as informações e intenções da solicitação.
+2. **Validação:** verifica se existem dados suficientes para planejar o trajeto.
+3. **Consulta:** utiliza ferramentas e RAG para recuperar informações sobre linhas, paradas e itinerários.
+4. **Análise:** compara as alternativas encontradas considerando as preferências do usuário.
+5. **Recomendação:** seleciona as opções mais adequadas.
+6. **Resposta:** apresenta os resultados em linguagem natural.
+
 </details>
-    
+
 <details>
-#### Outputs (Saídas)
+<summary>Outputs (Saídas)</summary>
+
+Informações apresentadas ao passageiro:
+
+- Alternativas de trajetos.
+- Linhas e paradas recomendadas.
+- Sequência de deslocamento.
+- Tempo estimado de viagem, quando disponível.
+- Quantidade de baldeações.
+- Justificativa da recomendação.
+
 </details>
-    
-### Diagrama do fluxo
+
+### 📊 Diagrama do fluxo
 
 ```mermaid
 flowchart TD
