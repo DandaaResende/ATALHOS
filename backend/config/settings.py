@@ -49,6 +49,7 @@ INSTALLED_APPS = [
 
     # Aplicações do projeto
     'rotas',
+    'ia',
 ]
 
 MIDDLEWARE = [
