@@ -4,7 +4,7 @@
 venv/
 env/
 
-# Variáveis de ambiente
+# Vari├íveis de ambiente
 .env
 .env.*
 !.env.example
@@ -30,3 +30,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Arquivos temporários do Python
+__pycache__/
+*.py[cod]

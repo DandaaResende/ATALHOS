@@ -1,0 +1,12 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url,agency_email
+BOA,Borborema imperial transportes ltda,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+CAX,Caxangá empresa de transporte coletivo s/a.,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+CNO,Consórcio conorte,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+CSR,Consórcio recife de transporte,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+CTC,Cooperativa de transporte coletivo de passageiros do estado de pernambuco - coopernorte,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+EME,Metropolitana empresa de transporte coletivo s/a.,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+GLO,Transportadora globo ltda,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+MOB,Mobibrasil expresso s.a.,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+SJT,São judas tadeu transportes ltda.,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+VML,Viação mirim ltda,https://www.granderecife.pe.gov.br/,America/Recife,pt,+558131825506,https://www.granderecife.pe.gov.br/transporte/tarifas/,dcac@granderecife.pe.gov.br
+metrorec,CBTU - Metrô do Recife (Metrorec),https://www.gov.br/cbtu/pt-br,America/Recife,pt,0800 281 1912,https://www.gov.br/cbtu/pt-br/servicos/cbtu-recife/horarios-e-linhas,ouvidoria-ac@cbtu.gov.br
