@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.shortcuts import render
 from .services import buscar_coordenadas
-from .gtfs import buscar_itinerario
+from .gtfs import buscar_itinerario, buscar_todas_paradas
 
 def api_buscar_rota(request):
     # Pega os dados da URL
@@ -43,3 +43,7 @@ def api_itinerario(request, codigo):
 
 def pagina_mapa(request):
     return render(request, 'mapa.html')
+
+def api_todas_paradas(request):
+    paradas = buscar_todas_paradas()
+    return JsonResponse({"paradas": paradas})

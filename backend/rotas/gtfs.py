@@ -112,3 +112,24 @@ def buscar_itinerario(codigo, sentido="0"):
         "coordenadas": coordenadas,
         "paradas": paradas
     }
+
+def buscar_todas_paradas():
+    arquivo = PASTA_GTFS / "stops.txt"
+    paradas = []
+
+    with open(arquivo, encoding="utf-8-sig", newline="") as f:
+        registros = csv.DictReader(f)
+
+        for parada in registros:
+            paradas.append({
+                "id": parada["stop_id"],
+                "nome": (
+                    parada["stop_name"]
+                    if parada["stop_name"] != parada["stop_id"]
+                    else f"Parada {parada['stop_id']}"
+                ),
+                "latitude": float(parada["stop_lat"]),
+                "longitude": float(parada["stop_lon"])
+            })
+
+    return paradas

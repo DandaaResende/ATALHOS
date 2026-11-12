@@ -76,8 +76,63 @@
         }).addTo(mapa);
 
         let trajeto = null;
+
+        // Marcadores das paradas da linha selecionada
         let marcadores = L.layerGroup().addTo(mapa);
 
+        // Todas as paradas do GTFS
+        let todasParadas = [];
+
+        // Camada dos marcadores gerais
+        let marcadoresTodasParadas = L.layerGroup().addTo(mapa);
+
+
+        // Busca todas as paradas na API
+        async function carregarTodasParadas() {
+            const resposta = await fetch('/rotas/api/paradas/');
+            const dados = await resposta.json();
+
+            todasParadas = dados.paradas;
+        }
+
+
+        // Atualiza as paradas conforme o zoom e a área visível
+        function atualizarParadasVisiveis() {
+            marcadoresTodasParadas.clearLayers();
+
+            // Só mostra as paradas a partir do zoom 14
+            if (mapa.getZoom() < 14) {
+                return;
+            }
+
+            const limites = mapa.getBounds();
+
+            todasParadas.forEach(parada => {
+                const posicao = [
+                    parada.latitude,
+                    parada.longitude
+                ];
+
+                // Verifica se a parada está na área visível
+                if (limites.contains(posicao)) {
+                    L.circleMarker(posicao, {
+                        radius: 4,
+                        color: '#2e7d32',
+                        fillColor: '#4caf50',
+                        fillOpacity: 0.8
+                    })
+                    .bindPopup(parada.nome)
+                    .addTo(marcadoresTodasParadas);
+                }
+            });
+        }
+
+
+        // Atualiza os marcadores quando o mapa é movido ou aproximado
+        mapa.on('zoomend moveend', atualizarParadasVisiveis);
+
+
+        // Busca e exibe o itinerário de uma linha
         async function carregarLinha() {
             const codigo = document.getElementById('linha').value;
             const mensagem = document.getElementById('mensagem');
@@ -95,15 +150,18 @@
                     throw new Error(dados.erro);
                 }
 
+                // Remove o trajeto anterior
                 if (trajeto) {
                     mapa.removeLayer(trajeto);
                 }
 
+                // Monta as coordenadas do trajeto
                 const pontos = dados.coordenadas.map(ponto => [
                     ponto.latitude,
                     ponto.longitude
                 ]);
 
+                // Desenha a linha no mapa
                 trajeto = L.polyline(pontos, {
                     color: '#2e7d32',
                     weight: 5
@@ -114,7 +172,7 @@
                 // Limpa os marcadores da linha anterior
                 marcadores.clearLayers();
 
-                // Adiciona as paradas ao mapa
+                // Adiciona as paradas da linha selecionada
                 dados.paradas.forEach(parada => {
                     const marcador = L.marker([
                         parada.latitude,
@@ -137,7 +195,19 @@
             }
         }
 
+
+        // Carrega todas as paradas antes de atualizar os marcadores
+        carregarTodasParadas()
+            .then(() => {
+                atualizarParadasVisiveis();
+            })
+            .catch(erro => {
+                console.error('Erro ao carregar paradas:', erro);
+            });
+
+        // Carrega a linha inicial
         carregarLinha();
+
     </script>
 
 </body>
