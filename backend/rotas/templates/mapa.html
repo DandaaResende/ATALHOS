@@ -76,6 +76,7 @@
         }).addTo(mapa);
 
         let trajeto = null;
+        let marcadores = L.layerGroup().addTo(mapa);
 
         async function carregarLinha() {
             const codigo = document.getElementById('linha').value;
@@ -109,6 +110,24 @@
                 }).addTo(mapa);
 
                 mapa.fitBounds(trajeto.getBounds());
+
+                // Limpa os marcadores da linha anterior
+                marcadores.clearLayers();
+
+                // Adiciona as paradas ao mapa
+                dados.paradas.forEach(parada => {
+                    const marcador = L.marker([
+                        parada.latitude,
+                        parada.longitude
+                    ]);
+
+                    marcador.bindPopup(`
+                        <strong>${parada.nome}</strong><br>
+                        Parada ${parada.ordem}
+                    `);
+
+                    marcador.addTo(marcadores);
+                });
 
                 mensagem.textContent =
                     `Linha ${dados.linha} - ${dados.nome}`;

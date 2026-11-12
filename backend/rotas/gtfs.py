@@ -18,6 +18,54 @@ def buscar_linha(codigo):
 
     return None
 
+
+def buscar_paradas(trip_id):
+    arquivo_horarios = PASTA_GTFS / "stop_times.txt"
+    horarios = []
+
+    with open(arquivo_horarios, encoding="utf-8-sig", newline="") as f:
+        registros = csv.DictReader(f)
+
+        for registro in registros:
+            if registro["trip_id"] == trip_id:
+                horarios.append(registro)
+
+    horarios.sort(key=lambda item: int(item["stop_sequence"]))
+
+    ids_paradas = {item["stop_id"] for item in horarios}
+    paradas_encontradas = {}
+
+    arquivo_paradas = PASTA_GTFS / "stops.txt"
+
+    with open(arquivo_paradas, encoding="utf-8-sig", newline="") as f:
+        registros = csv.DictReader(f)
+
+        for parada in registros:
+            if parada["stop_id"] in ids_paradas:
+                paradas_encontradas[parada["stop_id"]] = parada
+
+    paradas = []
+
+    for horario in horarios:
+        parada = paradas_encontradas.get(horario["stop_id"])
+
+        if parada:
+            nome = parada["stop_name"]
+
+            if nome == parada["stop_id"]:
+                nome = f"Parada {parada['stop_id']}"
+
+            paradas.append({
+                "id": parada["stop_id"],
+                "nome": nome,
+                "latitude": float(parada["stop_lat"]),
+                "longitude": float(parada["stop_lon"]),
+                "ordem": int(horario["stop_sequence"])
+            })
+
+    return paradas
+
+
 def buscar_itinerario(codigo, sentido="0"):
     linha = buscar_linha(codigo)
 
@@ -54,10 +102,13 @@ def buscar_itinerario(codigo, sentido="0"):
                     "longitude": float(ponto["shape_pt_lon"])
                 })
 
+    paradas = buscar_paradas(viagem["trip_id"])
+
     return {
         "linha": linha["route_short_name"],
         "nome": linha["route_long_name"],
         "sentido": sentido,
         "destino": viagem["trip_headsign"],
-        "coordenadas": coordenadas
+        "coordenadas": coordenadas,
+        "paradas": paradas
     }
