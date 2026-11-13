@@ -16,8 +16,8 @@ export function CardRotaSelecionada({
   const trechos = rota.detalhes?.trechos || [];
 
   return (
-    <div className="relative z-20 w-full max-w-md mx-auto">
-      <div className="w-full bg-white rounded-t-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-6 transition-all max-h-[75vh] overflow-y-auto">
+    <div className="relative z-20 w-full max-w-md mx-auto pointer-events-none">
+      <div className="w-full bg-white rounded-t-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-6 transition-all max-h-[75vh] overflow-y-auto pointer-events-auto">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-xl font-bold text-[#05053a]">Transporte</h3>
           <button

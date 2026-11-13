@@ -451,14 +451,14 @@ export function Home() {
       <div className="relative z-10 w-full h-full flex flex-col justify-between pointer-events-none">
         
         {/* TOPO: HEADER INICIAL OU CARD DE TRAJETO OU BARRA DE NAVEGAÇÃO ATIVA */}
-        <div className="w-full pointer-events-auto">
+        <div className="w-full pointer-events-none">
           {/* Header inicial quando não estiver na busca expandida nem em navegação */}
           {!buscandoRota && !modoAcompanhamento && (
-            <header className="w-full p-4 flex flex-col gap-3 max-w-md mx-auto">
+            <header className="w-full p-4 flex flex-col gap-3 max-w-md mx-auto pointer-events-none">
               <div className="flex items-center gap-3">
                 <form
                   onSubmit={handleConsultarIA}
-                  className="flex-1 flex items-center bg-[#05053a] text-white rounded-full px-4 py-2.5 shadow-xl active:scale-[0.99] transition-transform"
+                  className="flex-1 flex items-center bg-[#05053a] text-white rounded-full px-4 py-2.5 shadow-xl active:scale-[0.99] transition-transform pointer-events-auto"
                 >
                   <Search className="w-5 h-5 text-gray-300 mr-2.5 shrink-0" />
                   <input
@@ -484,7 +484,7 @@ export function Home() {
 
                 <button
                   onClick={() => navigate('/perfil')}
-                  className="w-12 h-12 rounded-full bg-[#05053a] text-white flex items-center justify-center shadow-xl shrink-0 border-2 border-indigo-900 overflow-hidden active:scale-95 transition-transform cursor-pointer"
+                  className="w-12 h-12 rounded-full bg-[#05053a] text-white flex items-center justify-center shadow-xl shrink-0 border-2 border-indigo-900 overflow-hidden active:scale-95 transition-transform cursor-pointer pointer-events-auto"
                   title="Meu perfil"
                 >
                   <User className="w-6 h-6 text-indigo-200" />
@@ -493,7 +493,7 @@ export function Home() {
 
               {/* Resposta do assistente de IA se houver */}
               {respostaIAMensagem && (
-                <div className="relative bg-white/95 backdrop-blur border border-indigo-100 shadow-md rounded-2xl p-3.5 text-xs text-[#05053a] flex items-start justify-between gap-2 animate-fade-in">
+                <div className="relative bg-white/95 backdrop-blur border border-indigo-100 shadow-md rounded-2xl p-3.5 text-xs text-[#05053a] flex items-start justify-between gap-2 animate-fade-in pointer-events-auto">
                   <div className="flex items-start gap-2">
                     <Sparkles className="w-4 h-4 text-lime-600 shrink-0 mt-0.5" />
                     <p className="font-medium leading-relaxed">{respostaIAMensagem}</p>
@@ -508,7 +508,7 @@ export function Home() {
               )}
 
               {/* Botão rápido para abrir busca ou sugestões conhecidas */}
-              <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none text-xs">
+              <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none text-xs pointer-events-auto">
                 <button
                   onClick={() => setBuscandoRota(true)}
                   className="px-3.5 py-1.5 rounded-full bg-[#05053a] text-lime-300 font-bold shadow-md hover:brightness-110 active:scale-95 transition-all shrink-0 cursor-pointer"
@@ -533,11 +533,11 @@ export function Home() {
 
           {/* Topo quando está buscando rota (CardSeuTrajeto) e NÃO em acompanhamento */}
           {buscandoRota && !rotaEscolhida && !modoAcompanhamento && (
-            <div className="flex flex-col">
+            <div className="flex flex-col pointer-events-none">
               {/* Mensagem e orientação do assistente de IA quando ativa */}
               {respostaIAMensagem && (
-                <div className="max-w-md mx-auto w-full px-4 pt-3">
-                  <div className="relative bg-white/95 backdrop-blur border border-indigo-100 shadow-md rounded-2xl p-3.5 text-xs text-[#05053a] flex items-start justify-between gap-2 animate-fade-in">
+                <div className="max-w-md mx-auto w-full px-4 pt-3 pointer-events-none">
+                  <div className="relative bg-white/95 backdrop-blur border border-indigo-100 shadow-md rounded-2xl p-3.5 text-xs text-[#05053a] flex items-start justify-between gap-2 animate-fade-in pointer-events-auto">
                     <div className="flex items-start gap-2">
                       <Sparkles className="w-4 h-4 text-lime-600 shrink-0 mt-0.5" />
                       <p className="font-medium leading-relaxed">{respostaIAMensagem}</p>
@@ -582,10 +582,10 @@ export function Home() {
 
           {/* Botão de voltar quando uma rota específica foi escolhida e NÃO em acompanhamento */}
           {buscandoRota && rotaEscolhida && !modoAcompanhamento && (
-            <div className="p-4 max-w-md mx-auto w-full flex items-center justify-between">
+            <div className="p-4 max-w-md mx-auto w-full flex items-center justify-between pointer-events-none">
               <button
                 onClick={() => setRotaEscolhida(null)}
-                className="w-11 h-11 rounded-2xl bg-[#05053a] text-lime-300 flex items-center justify-center shadow-xl cursor-pointer active:scale-95 transition-transform"
+                className="w-11 h-11 rounded-2xl bg-[#05053a] text-lime-300 flex items-center justify-center shadow-xl cursor-pointer active:scale-95 transition-transform pointer-events-auto"
                 title="Voltar para opções de rotas"
               >
                 <ChevronLeft className="w-6 h-6" />
@@ -593,7 +593,7 @@ export function Home() {
 
               <button
                 onClick={fecharBusca}
-                className="px-4 py-2 rounded-full bg-white/90 text-[#05053a] text-xs font-bold shadow-md hover:bg-white active:scale-95 transition-all cursor-pointer border border-slate-200"
+                className="px-4 py-2 rounded-full bg-white/90 text-[#05053a] text-xs font-bold shadow-md hover:bg-white active:scale-95 transition-all cursor-pointer border border-slate-200 pointer-events-auto"
               >
                 Nova busca
               </button>
@@ -602,8 +602,8 @@ export function Home() {
 
           {/* Alerta de erro de localização se houver */}
           {erroLocalizacao && (
-            <div className="w-full max-w-md mx-auto px-4 mt-2">
-              <div className="bg-amber-600 text-white shadow-lg rounded-2xl p-3 text-xs flex items-center justify-between gap-2">
+            <div className="w-full max-w-md mx-auto px-4 mt-2 pointer-events-none">
+              <div className="bg-amber-600 text-white shadow-lg rounded-2xl p-3 text-xs flex items-center justify-between gap-2 pointer-events-auto">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span className="font-medium">{erroLocalizacao}</span>
@@ -621,7 +621,7 @@ export function Home() {
         </div>
 
         {/* BASE: LISTA DE SUGESTÕES OU DETALHES OU ACOMPANHAMENTO ATIVO */}
-        <div className="w-full pointer-events-auto">
+        <div className="w-full pointer-events-none">
           {/* 1. MODO ACOMPANHAMENTO ATIVO */}
           {modoAcompanhamento && rotaEscolhida && (
             <CardAcompanhamento

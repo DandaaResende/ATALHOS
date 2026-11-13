@@ -47,8 +47,8 @@ export function CardSeuTrajeto({
   );
 
   return (
-    <div className="relative z-30 w-full max-w-md mx-auto p-4">
-      <div className="w-full bg-white rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] p-5 transition-all">
+    <div className="relative z-30 w-full max-w-md mx-auto p-4 pointer-events-none">
+      <div className="w-full bg-white rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] p-5 transition-all pointer-events-auto">
         
         {/* Cabeçalho do Card */}
         <div className="flex items-center justify-between mb-3">

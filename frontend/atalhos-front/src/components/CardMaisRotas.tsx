@@ -20,8 +20,8 @@ interface CardMaisRotasProps {
 
 export function CardMaisRotas({ rotas, carregando, mensagemErro, onSelecionarRota }: CardMaisRotasProps) {
   return (
-    <div className="relative z-20 w-full max-w-md mx-auto">
-      <div className="w-full bg-white rounded-t-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-6 transition-all max-h-[60vh] overflow-y-auto">
+    <div className="relative z-20 w-full max-w-md mx-auto pointer-events-none">
+      <div className="w-full bg-white rounded-t-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-6 transition-all max-h-[60vh] overflow-y-auto pointer-events-auto">
         {carregando ? (
           <div className="animate-pulse flex flex-col gap-4 py-2">
             <div className="h-6 w-32 bg-slate-200 rounded-md"></div>

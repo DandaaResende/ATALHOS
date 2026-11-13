@@ -437,7 +437,39 @@ def _montar_trecho(
         })
 
     shape_id = viagem.get("shape_id")
-    coordenadas = dados["shapes"].get(shape_id, [])
+    coordenadas_shape = dados["shapes"].get(shape_id, [])
+    coordenadas = []
+
+    parada_emb = dados["paradas"].get(embarque["stop_id"])
+    parada_des = dados["paradas"].get(desembarque["stop_id"])
+
+    if coordenadas_shape and parada_emb and parada_des:
+        lat_emb, lon_emb = parada_emb["latitude"], parada_emb["longitude"]
+        lat_des, lon_des = parada_des["latitude"], parada_des["longitude"]
+
+        idx_emb = min(
+            range(len(coordenadas_shape)),
+            key=lambda i: (coordenadas_shape[i]["latitude"] - lat_emb) ** 2
+            + (coordenadas_shape[i]["longitude"] - lon_emb) ** 2,
+        )
+        idx_des = min(
+            range(len(coordenadas_shape)),
+            key=lambda i: (coordenadas_shape[i]["latitude"] - lat_des) ** 2
+            + (coordenadas_shape[i]["longitude"] - lon_des) ** 2,
+        )
+
+        if idx_emb < idx_des:
+            coordenadas = coordenadas_shape[idx_emb : idx_des + 1]
+        else:
+            coordenadas = [
+                {"latitude": p["latitude"], "longitude": p["longitude"]}
+                for p in paradas_trecho
+            ]
+    else:
+        coordenadas = [
+            {"latitude": p["latitude"], "longitude": p["longitude"]}
+            for p in paradas_trecho
+        ]
 
     return {
         "linha": linha.get("route_short_name", ""),
