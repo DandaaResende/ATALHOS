@@ -64,8 +64,8 @@ export function CardAcompanhamento({
   }, [posicaoUsuario, rota]);
 
   return (
-    <div className="relative z-30 w-full max-w-md mx-auto p-4">
-      <div className="w-full bg-white rounded-[28px] shadow-[0_8px_35px_rgba(0,0,0,0.18)] p-5 border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom-6 duration-200">
+    <div className="relative z-30 w-full max-w-md mx-auto p-4 pointer-events-none">
+      <div className="w-full bg-white rounded-[28px] shadow-[0_8px_35px_rgba(0,0,0,0.18)] p-5 border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom-6 duration-200 pointer-events-auto">
         
         {/* Barra superior de status do GPS e botão de centralizar */}
         <div className="flex items-center justify-between">

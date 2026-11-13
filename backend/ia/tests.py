@@ -1718,4 +1718,326 @@ class TesteRotasService(APITestCase):
         self.assertFalse(consultar_linha(None)["sucesso"])
 
 
+class TesteCenariosObrigatoriosPesquisaLocaisIA(APITestCase):
+    """
+    Testes automatizados cobrindo os cenários obrigatórios de interpretação de linguagem
+    natural, qualificação geográfica de locais e identificação de rotas via IA.
+    """
+
+    def setUp(self):
+        self.url = reverse("consultar_agente")
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_cenario_quero_ir_para_o_shopping_recife(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        """
+        Cenário: 'Quero ir para o Shopping Recife.'
+        A IA deve identificar o destino qualificado no Recife, marcar a origem como
+        faltante e orientar o usuário a informar o ponto de partida ou usar o GPS.
+        """
+        dados_ia = {
+            "intencao": "buscar_rota",
+            "origem": None,
+            "destino": "Shopping Recife, Boa Viagem, Recife",
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": ["origem"],
+            "mensagem": "Identifiquei que você deseja ir para o Shopping Recife. De onde você vai sair? Você pode me dizer seu ponto de partida ou usar sua localização atual."
+        }
+        mock_interpretar.return_value = dados_ia
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Quero ir para o Shopping Recife."},
+            format="json"
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        dados = resposta.json()
+        self.assertEqual(dados["intencao"], "buscar_rota")
+        self.assertEqual(dados["destino"], "Shopping Recife, Boa Viagem, Recife")
+        self.assertIsNone(dados["origem"])
+        self.assertIn("origem", dados["informacoes_faltantes"])
+        self.assertIn("Shopping Recife", dados["mensagem"])
+        mock_consultar_viagens.assert_not_called()
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_cenario_como_faco_pra_chegar_na_ufpe(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        """
+        Cenário: 'Como faço pra chegar na UFPE?'
+        A IA deve qualificar a universidade (UFPE no Recife), reconhecer como destino e solicitar a origem.
+        """
+        dados_ia = {
+            "intencao": "buscar_rota",
+            "origem": None,
+            "destino": "Universidade Federal de Pernambuco (UFPE), Cidade Universitária, Recife",
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": ["origem"],
+            "mensagem": "Entendido! Seu destino é a UFPE na Cidade Universitária. De onde você vai partir?"
+        }
+        mock_interpretar.return_value = dados_ia
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Como faço pra chegar na UFPE?"},
+            format="json"
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        dados = resposta.json()
+        self.assertEqual(dados["destino"], "Universidade Federal de Pernambuco (UFPE), Cidade Universitária, Recife")
+        self.assertIsNone(dados["origem"])
+        self.assertEqual(dados["informacoes_faltantes"], ["origem"])
+        mock_consultar_viagens.assert_not_called()
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_cenario_me_leva_ate_o_centro(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        """
+        Cenário: 'Me leva até o centro.'
+        A IA deve contextualizar o Centro de Recife (Bairro do Recife / Santo Antônio) como destino.
+        """
+        dados_ia = {
+            "intencao": "buscar_rota",
+            "origem": None,
+            "destino": "Bairro do Recife, Centro, Recife",
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": ["origem"],
+            "mensagem": "Entendi que você deseja ir ao Centro do Recife. Qual será o ponto de partida do seu trajeto?"
+        }
+        mock_interpretar.return_value = dados_ia
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Me leva até o centro."},
+            format="json"
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        dados = resposta.json()
+        self.assertIn("Centro", dados["destino"])
+        self.assertIsNone(dados["origem"])
+        mock_consultar_viagens.assert_not_called()
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_cenario_parada_mais_proxima_do_marco_zero(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        """
+        Cenário: 'Quero ir para a parada mais próxima do Marco Zero.'
+        A IA deve identificar o Marco Zero (Recife Antigo) como destino e pedir a origem.
+        """
+        dados_ia = {
+            "intencao": "buscar_rota",
+            "origem": None,
+            "destino": "Marco Zero, Bairro do Recife, Recife",
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": ["origem"],
+            "mensagem": "Com certeza! Para encontrar as linhas e a parada mais próxima do Marco Zero, informe de onde você vai sair."
+        }
+        mock_interpretar.return_value = dados_ia
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Quero ir para a parada mais próxima do Marco Zero."},
+            format="json"
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        dados = resposta.json()
+        self.assertIn("Marco Zero", dados["destino"])
+        self.assertIsNone(dados["origem"])
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_cenario_boa_vista_para_casa_amarela_sem_inversao(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        """
+        Cenário: 'Estou na Boa Vista e quero chegar em Casa Amarela.'
+        A IA deve identificar Origem = Boa Vista e Destino = Casa Amarela, sem inverter os papéis.
+        """
+        dados_ia = {
+            "intencao": "buscar_rota",
+            "origem": "Boa Vista, Recife",
+            "destino": "Casa Amarela, Recife",
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": [],
+            "mensagem": "Identifiquei sua viagem saindo da Boa Vista em direção a Casa Amarela. Calculando rotas disponíveis."
+        }
+        mock_interpretar.return_value = dados_ia
+        mock_consultar_viagens.return_value = {
+            "sucesso": True,
+            "viagens": [{"linha": "640", "nome_linha": "Guabiraba / Derby"}],
+        }
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Estou na Boa Vista e quero chegar em Casa Amarela."},
+            format="json"
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        dados = resposta.json()
+        self.assertEqual(dados["origem"], "Boa Vista, Recife")
+        self.assertEqual(dados["destino"], "Casa Amarela, Recife")
+        mock_consultar_viagens.assert_called_once_with(
+            origem="Boa Vista, Recife",
+            destino="Casa Amarela, Recife",
+            data=None,
+            horario=None,
+            preferencias={},
+        )
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_cenario_qual_onibus_pego_para_chegar_no_shopping_ambiguo(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        """
+        Cenário: 'Qual ônibus pego para chegar no shopping?'
+        Como 'o shopping' é vago e a origem não foi dita, a IA deve solicitar esclarecimentos.
+        """
+        dados_ia = {
+            "intencao": "buscar_rota",
+            "origem": None,
+            "destino": None,
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": ["origem", "destino"],
+            "mensagem": "Temos vários shoppings na Região Metropolitana, como Shopping Recife, RioMar, Tacaruna e Plaza. A qual deles você deseja ir e de onde você vai sair?"
+        }
+        mock_interpretar.return_value = dados_ia
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Qual ônibus pego para chegar no shopping?"},
+            format="json"
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        dados = resposta.json()
+        self.assertIsNone(dados["origem"])
+        self.assertIsNone(dados["destino"])
+        self.assertIn("origem", dados["informacoes_faltantes"])
+        self.assertIn("destino", dados["informacoes_faltantes"])
+        mock_consultar_viagens.assert_not_called()
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_cenario_terminal_proximo_ao_centro_vago(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        """
+        Cenário: 'Quero ir para aquele terminal próximo ao centro.'
+        A IA deve sugerir os terminais próximos (TI Cais de Santa Rita ou Joana Bezerra) e pedir esclarecimento.
+        """
+        dados_ia = {
+            "intencao": "buscar_rota",
+            "origem": None,
+            "destino": None,
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": ["origem", "destino"],
+            "mensagem": "Você se refere ao Terminal Integrado Cais de Santa Rita ou ao TI Joana Bezerra, próximos ao Centro? E de onde você irá partir?"
+        }
+        mock_interpretar.return_value = dados_ia
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Quero ir para aquele terminal próximo ao centro."},
+            format="json"
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        dados = resposta.json()
+        self.assertIn("origem", dados["informacoes_faltantes"])
+        self.assertIn("destino", dados["informacoes_faltantes"])
+
+    @patch("ia.services.genai.Client")
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "chave_teste_123"})
+    def test_cenario_resiliencia_markdown_na_resposta_gemini(self, mock_client_class):
+        """
+        Verifica que blocos markdown ```json ... ``` retornados pelo Gemini
+        são devidamente extraídos sem gerar erro de decodificação JSON.
+        """
+        dados_ia = {
+            "intencao": "buscar_rota",
+            "origem": "Derby, Recife",
+            "destino": "Shopping Recife, Boa Viagem, Recife",
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": [],
+            "mensagem": "Calculando a rota do Derby para o Shopping Recife."
+        }
+        mock_resposta = MagicMock()
+        mock_resposta.text = f"```json\n{json.dumps(dados_ia)}\n```"
+        mock_instancia = mock_client_class.return_value
+        mock_instancia.models.generate_content.return_value = mock_resposta
+
+        resultado = interpretar_mensagem("qro ir p/ o shoppis recife saindo do derbi")
+
+        self.assertEqual(resultado, dados_ia)
+
+    def test_geocodificacao_prioriza_regiao_metropolitana_recife(self):
+        """
+        Verifica que a geocodificação de 'Boa Vista', 'Marco Zero' e 'Centro'
+        retorna coordenadas na Região Metropolitana do Recife (Pernambuco),
+        e não em Roraima ou São Paulo.
+        """
+        from rotas.services import buscar_coordenadas
+
+        coord_bv = buscar_coordenadas("Boa Vista")
+        self.assertNotIn("erro", coord_bv)
+        # Recife fica em latitude ~ -8 e longitude ~ -34.8 a -35.0
+        self.assertTrue(-9.0 <= coord_bv["latitude"] <= -7.5)
+        self.assertTrue(-36.0 <= coord_bv["longitude"] <= -34.0)
+        self.assertIn("Recife", coord_bv["nome_completo"])
+
+        coord_mz = buscar_coordenadas("Marco Zero")
+        self.assertNotIn("erro", coord_mz)
+        self.assertTrue(-9.0 <= coord_mz["latitude"] <= -7.5)
+        self.assertTrue(-36.0 <= coord_mz["longitude"] <= -34.0)
+
+        coord_sr = buscar_coordenadas("Shopping Recife")
+        self.assertNotIn("erro", coord_sr)
+        self.assertTrue(-9.0 <= coord_sr["latitude"] <= -7.5)
+        self.assertTrue(-36.0 <= coord_sr["longitude"] <= -34.0)
+
+
+
 
