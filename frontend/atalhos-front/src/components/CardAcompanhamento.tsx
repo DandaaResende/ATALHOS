@@ -6,9 +6,7 @@ import {
   Square,
   LocateFixed,
   MapPin,
-  Clock,
   Radio,
-  AlertTriangle,
 } from 'lucide-react';
 import type { OpcaoRota } from './CardMaisRotas';
 import type { Coordenadas, StatusRastreamento } from '../hooks/useGeolocalizacao';

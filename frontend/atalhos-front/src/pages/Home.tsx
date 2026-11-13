@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, User, ChevronLeft, Sparkles, X, AlertCircle } from 'lucide-react';
 import { CardSeuTrajeto } from '../components/CardSeuTrajeto';
@@ -6,8 +6,12 @@ import { CardMaisRotas } from '../components/CardMaisRotas';
 import type { OpcaoRota } from '../components/CardMaisRotas';
 import { CardRotaSelecionada } from '../components/CardRotaSelecionada';
 import { CardAcompanhamento } from '../components/CardAcompanhamento';
+import { CardPontoOnibus } from '../components/CardPontoOnibus';
+import { CardAvaliacaoOnibus } from '../components/CardAvaliacaoOnibus';
 import { MapaInterativo } from '../components/MapaInterativo';
 import { useGeolocalizacao } from '../hooks/useGeolocalizacao';
+import type { ParadaComOnibus, OnibusParada } from '../types/parada';
+import { carregarParadas, atualizarDistanciasParadas } from '../services/paradasService';
 import {
   buscarRotas,
   consultarIA,
@@ -55,6 +59,23 @@ export function Home() {
   const [mensagemIA, setMensagemIA] = useState('');
   const [consultandoIA, setConsultandoIA] = useState(false);
   const [respostaIAMensagem, setRespostaIAMensagem] = useState<string | null>(null);
+
+  // Estados para exibição de paradas e avaliação de ônibus (Pins no Mapa)
+  const [paradas, setParadas] = useState<ParadaComOnibus[]>(() => carregarParadas());
+  const [paradaSelecionada, setParadaSelecionada] = useState<ParadaComOnibus | null>(null);
+  const [onibusAvaliacao, setOnibusAvaliacao] = useState<OnibusParada | null>(null);
+
+  // Atualiza distâncias das paradas dinamicamente se a localização do usuário estiver disponível
+  useEffect(() => {
+    if (posicaoUsuario) {
+      setParadas((anteriores) =>
+        atualizarDistanciasParadas(anteriores, {
+          latitude: posicaoUsuario.latitude,
+          longitude: posicaoUsuario.longitude,
+        })
+      );
+    }
+  }, [posicaoUsuario]);
 
   // Executa a busca real de rotas no backend utilizando nomes e coordenadas
   const executarBuscaRotas = async (
@@ -318,6 +339,28 @@ export function Home() {
     setMensagemErro(null);
     setRotas([]);
     setRespostaIAMensagem(null);
+    setParadaSelecionada(null);
+    setOnibusAvaliacao(null);
+  };
+
+  const handleSelecionarParada = (parada: ParadaComOnibus) => {
+    setParadaSelecionada(parada);
+    setOnibusAvaliacao(null);
+    setSeguindoUsuario(false);
+  };
+
+  const handleTracadoRotaAPartirDaParada = (parada: ParadaComOnibus) => {
+    setOrigemTexto(parada.nome);
+    setOrigemLocal({
+      id: parada.id,
+      nome: parada.nome,
+      descricao: parada.bairro || 'Parada de ônibus',
+      latitude: parada.latitude,
+      longitude: parada.longitude,
+    });
+    setBuscandoRota(true);
+    setParadaSelecionada(null);
+    setOnibusAvaliacao(null);
   };
 
   const selecionarAtalho = async (origemNome: string, destinoNome: string) => {
@@ -418,6 +461,9 @@ export function Home() {
           seguindoUsuario={seguindoUsuario}
           onUsuarioArrastouMapa={() => setSeguindoUsuario(false)}
           modoAcompanhamento={modoAcompanhamento}
+          paradas={paradas}
+          paradaSelecionada={paradaSelecionada}
+          onSelecionarParada={handleSelecionarParada}
         />
       </div>
 
@@ -488,6 +534,17 @@ export function Home() {
                   className="px-3.5 py-1.5 rounded-full bg-[#05053a] text-lime-300 font-bold shadow-md hover:brightness-110 active:scale-95 transition-all shrink-0 cursor-pointer"
                 >
                   Planejar Trajeto
+                </button>
+                <button
+                  onClick={() => {
+                    const stop = paradas.find((p) => p.id === 'parada-adelino-29') || paradas[0];
+                    if (stop) handleSelecionarParada(stop);
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-white/95 text-[#05053a] font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all shrink-0 cursor-pointer border border-slate-200 flex items-center gap-1.5"
+                  title="Ver parada Rua Doutor Adélino, 29"
+                >
+                  <span className="w-2 h-2 rounded-full bg-lime-500 animate-pulse"></span>
+                  Parada Dr. Adélino, 29
                 </button>
                 <button
                   onClick={() => selecionarAtalho('Shopping Recife', 'Marco Zero')}
@@ -576,7 +633,7 @@ export function Home() {
           )}
         </div>
 
-        {/* BASE: LISTA DE SUGESTÕES OU DETALHES OU ACOMPANHAMENTO ATIVO */}
+        {/* BASE: LISTA DE SUGESTÕES OU DETALHES OU ACOMPANHAMENTO ATIVO OU DETALHES DA PARADA */}
         <div className="w-full pointer-events-auto">
           {/* 1. MODO ACOMPANHAMENTO ATIVO */}
           {modoAcompanhamento && rotaEscolhida && (
@@ -594,8 +651,31 @@ export function Home() {
             />
           )}
 
-          {/* 2. LISTA DE SUGESTÕES DE ROTAS */}
-          {!modoAcompanhamento && buscandoRota && temCamposPreenchidos && !rotaEscolhida && (
+          {/* 2. TELA DO ÔNIBUS (AVALIAÇÃO) - IMAGEM 2 */}
+          {!modoAcompanhamento && paradaSelecionada && onibusAvaliacao && (
+            <CardAvaliacaoOnibus
+              onibus={onibusAvaliacao}
+              parada={paradaSelecionada}
+              onVoltar={() => setOnibusAvaliacao(null)}
+              onFechar={() => {
+                setParadaSelecionada(null);
+                setOnibusAvaliacao(null);
+              }}
+            />
+          )}
+
+          {/* 3. TELA DO PONTO DE ÔNIBUS - IMAGEM 1 */}
+          {!modoAcompanhamento && paradaSelecionada && !onibusAvaliacao && (
+            <CardPontoOnibus
+              parada={paradaSelecionada}
+              onFechar={() => setParadaSelecionada(null)}
+              onClicarInfo={(onibus) => setOnibusAvaliacao(onibus)}
+              onTracadoRota={handleTracadoRotaAPartirDaParada}
+            />
+          )}
+
+          {/* 4. LISTA DE SUGESTÕES DE ROTAS */}
+          {!modoAcompanhamento && !paradaSelecionada && buscandoRota && temCamposPreenchidos && !rotaEscolhida && (
             <CardMaisRotas
               rotas={rotas}
               carregando={carregandoRotas}
@@ -604,8 +684,8 @@ export function Home() {
             />
           )}
 
-          {/* 3. CARD DE ROTA SELECIONADA (com botão de Iniciar Acompanhamento) */}
-          {!modoAcompanhamento && buscandoRota && rotaEscolhida && (
+          {/* 5. CARD DE ROTA SELECIONADA (com botão de Iniciar Acompanhamento) */}
+          {!modoAcompanhamento && !paradaSelecionada && buscandoRota && rotaEscolhida && (
             <CardRotaSelecionada
               rota={rotaEscolhida}
               onVerMaisRotas={() => setRotaEscolhida(null)}

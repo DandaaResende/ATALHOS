@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { LocateFixed, Loader2 } from 'lucide-react';
 import type { OpcaoRota } from './CardMaisRotas';
 import type { Coordenadas } from '../hooks/useGeolocalizacao';
+import type { ParadaComOnibus } from '../types/parada';
 
 interface PontoCoordenada {
   latitude: number;
@@ -20,6 +21,9 @@ interface MapaInterativoProps {
   seguindoUsuario?: boolean;
   onUsuarioArrastouMapa?: () => void;
   modoAcompanhamento?: boolean;
+  paradas?: ParadaComOnibus[];
+  paradaSelecionada?: ParadaComOnibus | null;
+  onSelecionarParada?: (parada: ParadaComOnibus) => void;
   className?: string;
 }
 
@@ -96,6 +100,42 @@ const iconeParada = L.divIcon({
   popupAnchor: [0, -8],
 });
 
+/**
+ * Cria o marcador visual do ponto/parada de ônibus no mapa interativo
+ */
+function criarIconeParadaOnibus(selecionada = false) {
+  return L.divIcon({
+    className: 'custom-bus-stop-pin',
+    html: `
+      <div class="relative flex flex-col items-center cursor-pointer transition-transform duration-200 ${
+        selecionada ? 'scale-125 z-50' : 'hover:scale-110'
+      }">
+        <div class="w-8 h-8 rounded-full ${
+          selecionada
+            ? 'bg-[#05053a] ring-4 ring-lime-400 shadow-2xl'
+            : 'bg-[#05053a] hover:bg-[#0c0c5c] shadow-lg'
+        } text-lime-300 flex items-center justify-center border-2 border-white transition-all">
+          <svg class="w-4 h-4 text-lime-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 6v6"/>
+            <path d="M15 6v6"/>
+            <path d="M2 12h19.6"/>
+            <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5c-.3-1-1.1-1.8-2.2-1.8H5.8c-1.1 0-1.9.8-2.2 1.8l-1.4 5c-.1.4-.2.8-.2 1.2 0 .4.1.8.2 1.2.3 1.1.8 2.8.8 2.8h3"/>
+            <circle cx="7" cy="18" r="2"/>
+            <path d="M9 18h5"/>
+            <circle cx="16" cy="18" r="2"/>
+          </svg>
+        </div>
+        <div class="w-2 h-2 ${
+          selecionada ? 'bg-lime-400' : 'bg-[#05053a]'
+        } transform rotate-45 -mt-1 border-r border-b border-white shadow-sm"></div>
+      </div>
+    `,
+    iconSize: [32, 38],
+    iconAnchor: [16, 36],
+    popupAnchor: [0, -36],
+  });
+}
+
 export function MapaInterativo({
   posicaoUsuario,
   pontoOrigem,
@@ -106,6 +146,9 @@ export function MapaInterativo({
   seguindoUsuario = false,
   onUsuarioArrastouMapa,
   modoAcompanhamento = false,
+  paradas = [],
+  paradaSelecionada = null,
+  onSelecionarParada,
   className = '',
 }: MapaInterativoProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -115,6 +158,7 @@ export function MapaInterativo({
   const camadaUsuarioRef = useRef<L.LayerGroup>(L.layerGroup());
   const camadaPontosRef = useRef<L.LayerGroup>(L.layerGroup());
   const camadaRotaRef = useRef<L.LayerGroup>(L.layerGroup());
+  const camadaParadasGeraisRef = useRef<L.LayerGroup>(L.layerGroup());
 
   // Referência única do marcador e do círculo do usuário para evitar duplicidade
   const marcadorUsuarioRef = useRef<L.Marker | null>(null);
@@ -147,6 +191,7 @@ export function MapaInterativo({
     camadaUsuarioRef.current.addTo(mapa);
     camadaPontosRef.current.addTo(mapa);
     camadaRotaRef.current.addTo(mapa);
+    camadaParadasGeraisRef.current.addTo(mapa);
 
     // Detecta quando o usuário arrasta manualmente o mapa para desligar o auto-follow
     mapa.on('dragstart', () => {
@@ -299,6 +344,59 @@ export function MapaInterativo({
       });
     }
   }, [rotaSelecionada, modoAcompanhamento]);
+
+  // 4. Exibição de Paradas de Ônibus Interativas no Mapa
+  useEffect(() => {
+    const camada = camadaParadasGeraisRef.current;
+    camada.clearLayers();
+
+    if (!mapInstanceRef.current || modoAcompanhamento || !paradas || paradas.length === 0) {
+      return;
+    }
+
+    paradas.forEach((parada) => {
+      const isSelecionada = paradaSelecionada?.id === parada.id;
+      const icone = criarIconeParadaOnibus(isSelecionada);
+
+      const marcador = L.marker([parada.latitude, parada.longitude], {
+        icon: icone,
+        zIndexOffset: isSelecionada ? 1000 : 100,
+      }).addTo(camada);
+
+      const proxLinha =
+        parada.onibus && parada.onibus.length > 0
+          ? `Linha ${parada.onibus[0].linha} em ${parada.onibus[0].tempoMinutos} min`
+          : `${parada.onibus?.length || 0} linhas`;
+
+      marcador.bindTooltip(
+        `<div style="font-family: inherit; font-size: 11px; padding: 2px 4px;">
+           <b style="color: #05053a;">${parada.nome}</b><br>
+           <span style="color: #15803d; font-weight: 600;">● ${proxLinha}</span>
+         </div>`,
+        {
+          direction: 'top',
+          offset: [0, -32],
+          opacity: 0.95,
+        }
+      );
+
+      marcador.on('click', () => {
+        if (onSelecionarParada) {
+          onSelecionarParada(parada);
+        }
+      });
+    });
+  }, [paradas, paradaSelecionada, modoAcompanhamento, onSelecionarParada]);
+
+  // 5. Centralização suave ao selecionar uma parada de ônibus
+  useEffect(() => {
+    if (!paradaSelecionada || !mapInstanceRef.current || modoAcompanhamento) return;
+
+    mapInstanceRef.current.panTo(
+      [paradaSelecionada.latitude, paradaSelecionada.longitude],
+      { animate: true, duration: 0.8 }
+    );
+  }, [paradaSelecionada, modoAcompanhamento]);
 
   return (
     <div className={`relative w-full h-full overflow-hidden ${className}`}>
