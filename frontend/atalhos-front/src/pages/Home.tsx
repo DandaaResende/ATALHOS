@@ -8,13 +8,140 @@ import { CardRotaSelecionada } from '../components/CardRotaSelecionada';
 import { CardAcompanhamento } from '../components/CardAcompanhamento';
 import { MapaInterativo } from '../components/MapaInterativo';
 import { useGeolocalizacao } from '../hooks/useGeolocalizacao';
+import { consultarAgente } from '../services/iaService';
 import {
   buscarRotas,
-  consultarIA,
   buscarSugestoesLocais,
   type SugestaoLocal,
   type ParametrosBuscaRota,
+  type OpcaoRotaBackend,
 } from '../services/api';
+import type {
+  LocalConsulta,
+  MensagemHistorico,
+  ResultadoConsulta,
+  ResultadoLinhaSucesso,
+  ResultadoViagensSucesso,
+  Viagem,
+} from '../types/ia';
+
+const LIMITE_HISTORICO_IA = 10;
+
+function ehResultadoViagensSucesso(
+  resultado: ResultadoConsulta,
+): resultado is ResultadoViagensSucesso {
+  return Boolean(
+    resultado
+    && resultado.sucesso
+    && 'viagens' in resultado,
+  );
+}
+
+function ehResultadoLinhaSucesso(
+  resultado: ResultadoConsulta,
+): resultado is ResultadoLinhaSucesso {
+  return Boolean(
+    resultado
+    && resultado.sucesso
+    && 'itinerario' in resultado
+    && 'linha' in resultado,
+  );
+}
+
+function converterViagemParaOpcao(
+  viagem: Viagem,
+  index: number,
+): OpcaoRota {
+  const linhas = viagem.trechos.map((trecho) => trecho.linha).filter(Boolean);
+  const descricoes = viagem.trechos
+    .map((trecho) => trecho.nome_linha || trecho.sentido)
+    .filter(Boolean);
+  const via = descricoes.length > 0
+    ? descricoes.join(' ➔ ')
+    : viagem.tipo === 'direta'
+      ? 'Linha direta'
+      : 'Com integração';
+  const distancia = viagem.distancia_caminhada_total > 0
+    ? `${(viagem.distancia_caminhada_total / 1000).toFixed(1)}km caminhada`
+    : 'Próximo à parada';
+
+  const detalhes: OpcaoRotaBackend = {
+    tipo: viagem.tipo === 'com_integracao' ? 'integracao' : 'direta',
+    quantidade_integracoes: viagem.quantidade_integracoes,
+    horario_saida: viagem.horario_saida,
+    horario_chegada: viagem.horario_chegada,
+    tempo_total_minutos: viagem.tempo_total_minutos,
+    distancia_caminhada_total: viagem.distancia_caminhada_total,
+    trechos: viagem.trechos.map((trecho) => ({
+      ...trecho,
+      paradas: trecho.paradas.map((parada, paradaIndex) => ({
+        ...parada,
+        ordem: parada.ordem ?? paradaIndex + 1,
+      })),
+    })),
+    integracoes: viagem.integracoes,
+  };
+
+  return {
+    id: index + 1,
+    tempo: Math.round(viagem.tempo_total_minutos),
+    distancia,
+    via,
+    linhas,
+    horarioSaida: viagem.horario_saida,
+    horarioChegada: viagem.horario_chegada,
+    detalhes,
+  };
+}
+
+function converterLocalIA(
+  local: LocalConsulta,
+  prefixo: string,
+): SugestaoLocal | null {
+  if (
+    !Number.isFinite(local.latitude)
+    || !Number.isFinite(local.longitude)
+  ) {
+    return null;
+  }
+
+  const nome = local.nome_completo || local.endereco;
+  if (!nome) {
+    return null;
+  }
+
+  return {
+    id: `${prefixo}-${local.latitude}-${local.longitude}`,
+    nome,
+    descricao: local.endereco,
+    latitude: local.latitude,
+    longitude: local.longitude,
+  };
+}
+
+function formatarResultadoLinha(
+  resultado: ResultadoLinhaSucesso,
+  mensagem: string,
+): string {
+  const nomeLinha = resultado.linha.route_short_name || resultado.linha.route_id;
+  const partes = [`Linha ${nomeLinha}`];
+
+  if (resultado.linha.route_long_name) {
+    partes.push(resultado.linha.route_long_name);
+  }
+
+  if (resultado.itinerario) {
+    partes.push(
+      `Sentido: ${resultado.itinerario.sentido}`,
+      `Destino: ${resultado.itinerario.destino}`,
+      `${resultado.itinerario.paradas.length} paradas`,
+    );
+  } else if (resultado.aviso) {
+    partes.push(resultado.aviso);
+  }
+
+  return [mensagem, partes.join(' · ')].filter(Boolean).join('\n');
+}
 
 export function Home() {
   const navigate = useNavigate();
@@ -55,6 +182,7 @@ export function Home() {
   const [mensagemIA, setMensagemIA] = useState('');
   const [consultandoIA, setConsultandoIA] = useState(false);
   const [respostaIAMensagem, setRespostaIAMensagem] = useState<string | null>(null);
+  const [historicoIA, setHistoricoIA] = useState<MensagemHistorico[]>([]);
 
   // Executa a busca real de rotas no backend utilizando nomes e coordenadas
   const executarBuscaRotas = async (
@@ -318,6 +446,7 @@ export function Home() {
     setMensagemErro(null);
     setRotas([]);
     setRespostaIAMensagem(null);
+    setHistoricoIA([]);
   };
 
   const selecionarAtalho = async (origemNome: string, destinoNome: string) => {
@@ -355,38 +484,96 @@ export function Home() {
     e.preventDefault();
     const texto = mensagemIA.trim();
     if (!texto) {
-      setBuscandoRota(true);
       return;
     }
 
     setConsultandoIA(true);
     setRespostaIAMensagem(null);
+    setMensagemErro(null);
+    setMensagemValidacao(null);
+    setRotas([]);
+    setRotaEscolhida(null);
+    setOrigemLocal(null);
+    setDestinoLocal(null);
+    setCarregandoRotas(false);
+    setBuscandoRota(false);
 
     try {
-      const resposta = await consultarIA(texto);
+      const resposta = await consultarAgente(texto, historicoIA);
+      const mensagemResposta = resposta.mensagem || 'Resposta recebida do assistente.';
+      const mensagensNovas: MensagemHistorico[] = [
+        { papel: 'usuario', texto },
+        { papel: 'assistente', texto: mensagemResposta },
+      ];
 
-      if (resposta.mensagem) {
-        setRespostaIAMensagem(resposta.mensagem);
-      }
+      setHistoricoIA((historicoAtual) => [
+        ...historicoAtual,
+        ...mensagensNovas,
+      ].slice(-LIMITE_HISTORICO_IA));
+
+      setRespostaIAMensagem(mensagemResposta);
 
       if (resposta.intencao === 'buscar_rota') {
-        const novaOrigemNome = resposta.origem || origemTexto || '';
-        const novoDestinoNome = resposta.destino || destinoTexto || '';
+        const resultado = resposta.resultado;
+        const resultadoViagens = ehResultadoViagensSucesso(resultado)
+          ? resultado
+          : null;
+        const novaOrigemNome = resposta.origem
+          || resultadoViagens?.origem.endereco
+          || '';
+        const novoDestinoNome = resposta.destino
+          || resultadoViagens?.destino.endereco
+          || '';
 
         setOrigemTexto(novaOrigemNome);
         setDestinoTexto(novoDestinoNome);
         setBuscandoRota(true);
 
-        if (novaOrigemNome && novoDestinoNome) {
-          await selecionarAtalho(novaOrigemNome, novoDestinoNome);
+        if (resposta.informacoes_faltantes.length > 0) {
+          setMensagemValidacao(mensagemResposta);
+        } else if (resultadoViagens) {
+          const localOrigem = converterLocalIA(resultadoViagens.origem, 'ia-origem');
+          const localDestino = converterLocalIA(resultadoViagens.destino, 'ia-destino');
+
+          setOrigemLocal(localOrigem);
+          setDestinoLocal(localDestino);
+          const opcoesFormatadas = resultadoViagens.viagens.map(
+            converterViagemParaOpcao,
+          );
+          setRotas(opcoesFormatadas);
+
+          if (opcoesFormatadas.length > 0) {
+            setRotaEscolhida(opcoesFormatadas[0]);
+          } else {
+            setMensagemErro(
+              resultadoViagens.mensagem
+              || mensagemResposta
+              || 'Nenhuma opção de viagem encontrada.',
+            );
+          }
+        } else if (resultado && !resultado.sucesso) {
+          setMensagemErro(resultado.erro);
+        } else {
+          setMensagemValidacao(mensagemResposta);
         }
+      } else if (resposta.intencao === 'consultar_linha') {
+        setRespostaIAMensagem(
+          ehResultadoLinhaSucesso(resposta.resultado)
+            ? formatarResultadoLinha(resposta.resultado, mensagemResposta)
+            : resposta.resultado && !resposta.resultado.sucesso
+              ? resposta.resultado.erro
+              : mensagemResposta,
+        );
       } else {
-        setRespostaIAMensagem(resposta.mensagem || 'Como posso te ajudar com seu trajeto hoje?');
+        setRespostaIAMensagem(mensagemResposta);
       }
-    } catch (erro: any) {
-      console.warn('Assistente de IA indisponível, abrindo busca padrão:', erro);
-      setBuscandoRota(true);
-      setDestinoTexto(texto);
+    } catch (erro: unknown) {
+      console.warn('Erro ao consultar o assistente de IA:', erro);
+      setRespostaIAMensagem(
+        erro instanceof Error
+          ? erro.message
+          : 'Não foi possível consultar o assistente de IA.',
+      );
     } finally {
       setConsultandoIA(false);
     }

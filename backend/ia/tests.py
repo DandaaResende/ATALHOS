@@ -7,8 +7,15 @@ from google.genai import types
 from rest_framework import serializers, status
 from rest_framework.test import APITestCase
 
+from ia.rotas_service import (
+    consultar_linha,
+    consultar_viagens,
+    normalizar_data,
+    normalizar_horario,
+)
 from ia.serializers import RespostaAgenteSerializer, StrictCharField
 from ia.services import interpretar_mensagem
+from rotas.gtfs import ErroGTFS
 
 
 class TesteServicoInterpretarMensagem(APITestCase):
@@ -363,8 +370,13 @@ class TesteConsultarAgenteView(APITestCase):
     def setUp(self):
         self.url = reverse("consultar_agente")
 
+    @patch("ia.views.consultar_viagens")
     @patch("ia.views.interpretar_mensagem")
-    def test_post_mensagem_valida_retorna_200(self, mock_interpretar):
+    def test_post_mensagem_valida_retorna_200(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
         """
         Verifica se uma requisição POST com mensagem válida retorna HTTP 200 e os dados interpretados.
         """
@@ -379,6 +391,10 @@ class TesteConsultarAgenteView(APITestCase):
             "mensagem": "Calculando opções de transporte."
         }
         mock_interpretar.return_value = dados_esperados
+        mock_consultar_viagens.return_value = {
+            "sucesso": True,
+            "viagens": [{"linha": "202"}],
+        }
 
         resposta = self.client.post(
             self.url,
@@ -387,8 +403,21 @@ class TesteConsultarAgenteView(APITestCase):
         )
 
         self.assertEqual(resposta.status_code, status.HTTP_200_OK)
-        self.assertEqual(resposta.json(), dados_esperados)
+        self.assertEqual(
+            resposta.json(),
+            {
+                **dados_esperados,
+                "resultado": mock_consultar_viagens.return_value,
+            },
+        )
         mock_interpretar.assert_called_once_with("Quero ir do Terminal Central até a Praça da Sé")
+        mock_consultar_viagens.assert_called_once_with(
+            origem="Terminal Central",
+            destino="Praça da Sé",
+            data=None,
+            horario=None,
+            preferencias={},
+        )
 
     def test_post_sem_campo_mensagem_retorna_400(self):
         """
@@ -440,8 +469,13 @@ class TesteConsultarAgenteView(APITestCase):
 
         self.assertEqual(resposta.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
+    @patch("ia.views.consultar_viagens")
     @patch("ia.views.interpretar_mensagem")
-    def test_post_mensagem_valida_com_historico_retorna_200(self, mock_interpretar):
+    def test_post_mensagem_valida_com_historico_retorna_200(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
         """
         Verifica se requisição com mensagem e histórico válidos retorna HTTP 200 e encaminha ao serviço.
         """
@@ -456,6 +490,7 @@ class TesteConsultarAgenteView(APITestCase):
             "mensagem": "Calculando rotas para a UFPE."
         }
         mock_interpretar.return_value = dados_esperados
+        mock_consultar_viagens.return_value = {"sucesso": True, "viagens": []}
 
         historico_requisicao = [
             {"papel": "usuario", "texto": "Quero chegar à UFPE."},
@@ -470,7 +505,13 @@ class TesteConsultarAgenteView(APITestCase):
         resposta = self.client.post(self.url, payload, format="json")
 
         self.assertEqual(resposta.status_code, status.HTTP_200_OK)
-        self.assertEqual(resposta.json(), dados_esperados)
+        self.assertEqual(
+            resposta.json(),
+            {
+                **dados_esperados,
+                "resultado": mock_consultar_viagens.return_value,
+            },
+        )
         mock_interpretar.assert_called_once_with(
             "Qual ônibus passa perto do Terminal da Macaxeira?",
             historico=[
@@ -478,9 +519,23 @@ class TesteConsultarAgenteView(APITestCase):
                 {"papel": "assistente", "texto": "De onde você vai sair?"}
             ]
         )
+        mock_consultar_viagens.assert_called_once_with(
+            origem="Terminal da Macaxeira",
+            destino="UFPE",
+            data=None,
+            horario=None,
+            preferencias={},
+        )
 
+    @patch("ia.views.consultar_linha_rota")
+    @patch("ia.views.consultar_viagens")
     @patch("ia.views.interpretar_mensagem")
-    def test_post_historico_omitido_nulo_e_vazio(self, mock_interpretar):
+    def test_post_historico_omitido_nulo_e_vazio(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+        mock_consultar_linha,
+    ):
         """
         Verifica que histórico omitido, nulo (None) ou lista vazia são aceitos sem erro.
         """
@@ -509,6 +564,194 @@ class TesteConsultarAgenteView(APITestCase):
         res3 = self.client.post(self.url, {"mensagem": "Olá", "historico": []}, format="json")
         self.assertEqual(res3.status_code, status.HTTP_200_OK)
         mock_interpretar.assert_called_with("Olá")
+        mock_consultar_viagens.assert_not_called()
+        mock_consultar_linha.assert_not_called()
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_buscar_rota_com_origem_destino_consulta_servico(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        mock_interpretar.return_value = {
+            "intencao": "buscar_rota",
+            "origem": "Origem",
+            "destino": "Destino",
+            "data": "2026-11-20",
+            "horario": "08:00",
+            "preferencias": {"evitar_baldeacoes": True},
+            "informacoes_faltantes": [],
+            "mensagem": "Consultando.",
+        }
+        resultado = {"sucesso": True, "viagens": [{"linha": "202"}]}
+        mock_consultar_viagens.return_value = resultado
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Quero viajar"},
+            format="json",
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.assertEqual(resposta.json()["resultado"], resultado)
+        mock_consultar_viagens.assert_called_once_with(
+            origem="Origem",
+            destino="Destino",
+            data="2026-11-20",
+            horario="08:00",
+            preferencias={"evitar_baldeacoes": True},
+        )
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_buscar_rota_com_informacoes_faltantes_nao_consulta(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        mock_interpretar.return_value = {
+            "intencao": "buscar_rota",
+            "origem": None,
+            "destino": "Destino",
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": ["origem"],
+            "mensagem": "Informe a origem.",
+        }
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Quero viajar"},
+            format="json",
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.assertIsNone(resposta.json()["resultado"])
+        mock_consultar_viagens.assert_not_called()
+
+    @patch("ia.views.consultar_linha_rota")
+    @patch("ia.views.interpretar_mensagem")
+    def test_consultar_linha_com_codigo_consulta_servico(
+        self,
+        mock_interpretar,
+        mock_consultar_linha,
+    ):
+        mock_interpretar.return_value = {
+            "intencao": "consultar_linha",
+            "origem": None,
+            "destino": None,
+            "data": None,
+            "horario": None,
+            "preferencias": {"linha": "202"},
+            "informacoes_faltantes": [],
+            "mensagem": "Buscando a linha.",
+        }
+        resultado = {"sucesso": True, "linha": {"route_short_name": "202"}}
+        mock_consultar_linha.return_value = resultado
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Consulte a linha 202"},
+            format="json",
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.assertEqual(resposta.json()["resultado"], resultado)
+        mock_consultar_linha.assert_called_once_with("202")
+
+    @patch("ia.views.consultar_linha_rota")
+    @patch("ia.views.interpretar_mensagem")
+    def test_consultar_linha_sem_codigo_nao_consulta(
+        self,
+        mock_interpretar,
+        mock_consultar_linha,
+    ):
+        mock_interpretar.return_value = {
+            "intencao": "consultar_linha",
+            "origem": None,
+            "destino": None,
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": ["linha"],
+            "mensagem": "Informe a linha.",
+        }
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Consulte uma linha"},
+            format="json",
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.assertIsNone(resposta.json()["resultado"])
+        mock_consultar_linha.assert_not_called()
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.consultar_linha_rota")
+    @patch("ia.views.interpretar_mensagem")
+    def test_intencao_outro_nao_consulta_servicos(
+        self,
+        mock_interpretar,
+        mock_consultar_linha,
+        mock_consultar_viagens,
+    ):
+        mock_interpretar.return_value = {
+            "intencao": "outro",
+            "origem": None,
+            "destino": None,
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": [],
+            "mensagem": "Posso ajudar com transporte público.",
+        }
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Qual é a capital do Brasil?"},
+            format="json",
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.assertIsNone(resposta.json()["resultado"])
+        mock_consultar_linha.assert_not_called()
+        mock_consultar_viagens.assert_not_called()
+
+    @patch("ia.views.consultar_viagens")
+    @patch("ia.views.interpretar_mensagem")
+    def test_falha_do_servico_e_preservada_em_resultado(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
+        mock_interpretar.return_value = {
+            "intencao": "buscar_rota",
+            "origem": "Origem",
+            "destino": "Destino",
+            "data": None,
+            "horario": None,
+            "preferencias": {},
+            "informacoes_faltantes": [],
+            "mensagem": "Consultando.",
+        }
+        resultado = {
+            "sucesso": False,
+            "tipo_erro": "endereco_nao_encontrado",
+            "erro": "Origem não encontrada.",
+        }
+        mock_consultar_viagens.return_value = resultado
+
+        resposta = self.client.post(
+            self.url,
+            {"mensagem": "Quero viajar"},
+            format="json",
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.assertEqual(resposta.json()["resultado"], resultado)
 
     def test_post_historico_nao_lista_retorna_400(self):
         """
@@ -621,8 +864,13 @@ class TesteConsultarAgenteView(APITestCase):
             )
             self.assertIn("não é permitido no histórico", resposta.json().get("erro", ""))
 
+    @patch("ia.views.consultar_viagens")
     @patch("ia.views.interpretar_mensagem")
-    def test_post_historico_encaminha_mensagem_e_historico_corretos(self, mock_interpretar):
+    def test_post_historico_encaminha_mensagem_e_historico_corretos(
+        self,
+        mock_interpretar,
+        mock_consultar_viagens,
+    ):
         """
         Verifica que mensagens com variantes 'role' e 'content' são normalizadas e encaminhadas corretamente.
         """
@@ -636,6 +884,7 @@ class TesteConsultarAgenteView(APITestCase):
             "informacoes_faltantes": [],
             "mensagem": "Calculando a rota."
         }
+        mock_consultar_viagens.return_value = {"sucesso": True, "viagens": []}
 
         payload = {
             "mensagem": "Como chego lá?",
@@ -961,6 +1210,512 @@ class TesteRespostaAgenteSerializer(APITestCase):
             with self.assertRaises(serializers.ValidationError) as ctx_tipo:
                 campo_padrao.run_validation(valor_invalido)
             self.assertEqual(ctx_tipo.exception.detail[0].code, "invalid")
+
+
+class TesteRotasService(APITestCase):
+    """
+    Testes unitários para a camada de integração entre a IA e o módulo rotas (rotas_service.py).
+    """
+
+    def setUp(self):
+        self.coordenadas_origem = {
+            "latitude": -8.0522,
+            "longitude": -34.8872,
+            "nome_completo": "Avenida Conde da Boa Vista, Recife - PE",
+        }
+        self.coordenadas_destino = {
+            "latitude": -8.0556,
+            "longitude": -34.9515,
+            "nome_completo": "Universidade Federal de Pernambuco, Recife - PE",
+        }
+        self.viagem_exemplo = {
+            "tipo": "direta",
+            "duracao_minutos": 35,
+            "linha": "202",
+            "nome_linha": "TI Barro / TI Macaxeira",
+            "origem": "Parada 1",
+            "destino": "Parada 2",
+        }
+
+    # 1. Testes de normalização de data
+    def test_normalizar_data_hoje_amanha_e_padroes(self):
+        """
+        Verifica a correta normalização de 'hoje', 'amanhã', strings vazias e datas ISO/BR.
+        """
+        hoje_str = normalizar_data("hoje")
+        self.assertRegex(hoje_str, r"^\d{4}-\d{2}-\d{2}$")
+
+        amanha_str = normalizar_data("amanhã")
+        self.assertRegex(amanha_str, r"^\d{4}-\d{2}-\d{2}$")
+        self.assertNotEqual(hoje_str, amanha_str)
+
+        # Sem acento
+        self.assertEqual(normalizar_data("amanha"), amanha_str)
+
+        # None ou vazio assume hoje
+        self.assertEqual(normalizar_data(None), hoje_str)
+        self.assertEqual(normalizar_data("   "), hoje_str)
+
+        # Formato ISO
+        self.assertEqual(normalizar_data("2026-12-25"), "2026-12-25")
+
+        # Formato brasileiro
+        self.assertEqual(normalizar_data("25/12/2026"), "2026-12-25")
+
+    def test_normalizar_data_invalida_lanca_erro(self):
+        """
+        Verifica que datas inválidas ou em formatos desconhecidos disparam ValueError.
+        """
+        for data_invalida in ["ontem", "32/13/2026", "2026-99-99", "semana_passada"]:
+            with self.assertRaises(ValueError):
+                normalizar_data(data_invalida)
+
+    # 2. Testes de normalização de horário
+    def test_normalizar_horario_padroes_e_h(self):
+        """
+        Verifica a correta normalização para o padrão HH:MM:SS exigido pelo GTFS.
+        """
+        self.assertEqual(normalizar_horario("14:30"), "14:30:00")
+        self.assertEqual(normalizar_horario("08:15:30"), "08:15:30")
+        self.assertEqual(normalizar_horario("14h30"), "14:30:00")
+        self.assertEqual(normalizar_horario("9h"), "09:00:00")
+
+        # None ou vazio assume horário atual
+        horario_atual = normalizar_horario(None)
+        self.assertRegex(horario_atual, r"^\d{2}:\d{2}:\d{2}$")
+
+    def test_normalizar_horario_invalido_lanca_erro(self):
+        """
+        Verifica que horários inválidos disparam ValueError.
+        """
+        for h_invalido in ["25:00", "14:65", "meio-dia", "abc"]:
+            with self.assertRaises(ValueError):
+                normalizar_horario(h_invalido)
+
+    # 3. Testes de consultar_viagens
+    @patch("ia.rotas_service.buscar_viagens")
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_sucesso_com_opcoes(self, mock_coords, mock_viagens):
+        """
+        Verifica fluxo com êxito na geocodificação e no retorno de opções de viagem.
+        """
+        mock_coords.side_effect = [
+            self.coordenadas_origem,
+            self.coordenadas_destino,
+        ]
+        mock_viagens.return_value = [self.viagem_exemplo]
+
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+            data="2026-11-20",
+            horario="14:30",
+        )
+
+        self.assertTrue(resultado["sucesso"])
+        self.assertEqual(resultado["total_opcoes"], 1)
+        self.assertEqual(resultado["viagens"], [self.viagem_exemplo])
+        self.assertEqual(resultado["data"], "2026-11-20")
+        self.assertEqual(resultado["horario"], "14:30:00")
+        self.assertTrue(resultado["permitir_integracao"])
+
+        mock_viagens.assert_called_once_with(
+            latitude_origem=-8.0522,
+            longitude_origem=-34.8872,
+            latitude_destino=-8.0556,
+            longitude_destino=-34.9515,
+            data_viagem="2026-11-20",
+            horario_minimo="14:30:00",
+            permitir_integracao=True,
+        )
+
+    @patch("ia.rotas_service.buscar_viagens")
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_respeita_evitar_baldeacoes(self, mock_coords, mock_viagens):
+        """
+        Verifica que a preferência 'evitar_baldeacoes' desabilita permitir_integracao.
+        """
+        mock_coords.side_effect = [
+            self.coordenadas_origem,
+            self.coordenadas_destino,
+        ]
+        mock_viagens.return_value = [self.viagem_exemplo]
+
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+            preferencias={"evitar_baldeacoes": True},
+        )
+
+        self.assertTrue(resultado["sucesso"])
+        self.assertFalse(resultado["permitir_integracao"])
+        _, kwargs = mock_viagens.call_args
+        self.assertFalse(kwargs["permitir_integracao"])
+
+    @patch("ia.rotas_service.buscar_viagens")
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_preserva_preferencias_nao_suportadas(
+        self,
+        mock_coords,
+        mock_viagens,
+    ):
+        mock_coords.side_effect = [
+            self.coordenadas_origem,
+            self.coordenadas_destino,
+        ]
+        mock_viagens.return_value = [self.viagem_exemplo]
+
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+            preferencias={
+                "ar_condicionado": True,
+                "mais_rapido": True,
+                "menor_caminhada": True,
+            },
+        )
+
+        self.assertTrue(resultado["sucesso"])
+        self.assertEqual(
+            resultado["preferencias_nao_atendidas"],
+            ["ar_condicionado", "mais_rapido", "menor_caminhada"],
+        )
+        _, kwargs = mock_viagens.call_args
+        self.assertTrue(kwargs["permitir_integracao"])
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_rejeita_preferencia_desconhecida(
+        self,
+        mock_coords,
+    ):
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+            preferencias={"veiculo_eletrico": True},
+        )
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "preferencias_invalidas")
+        self.assertIn("veiculo_eletrico", resultado["erro"])
+        mock_coords.assert_not_called()
+
+    @patch("ia.rotas_service.buscar_viagens")
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_linha_nao_e_filtro_aplicado(
+        self,
+        mock_coords,
+        mock_viagens,
+    ):
+        mock_coords.side_effect = [
+            self.coordenadas_origem,
+            self.coordenadas_destino,
+        ]
+        mock_viagens.return_value = [self.viagem_exemplo]
+
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+            preferencias={"linha": "202"},
+        )
+
+        self.assertTrue(resultado["sucesso"])
+        self.assertEqual(resultado["preferencias_nao_atendidas"], ["linha"])
+        _, kwargs = mock_viagens.call_args
+        self.assertNotIn("linha", kwargs)
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_linha_deve_ser_texto_nao_vazio(self, mock_coords):
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+            preferencias={"linha": True},
+        )
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "preferencias_invalidas")
+        self.assertIn("linha", resultado["erro"])
+        mock_coords.assert_not_called()
+
+    @patch("ia.rotas_service.buscar_viagens")
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_sem_opcoes(self, mock_coords, mock_viagens):
+        """
+        Verifica o retorno amigável quando o GTFS não encontra opções para o horário.
+        """
+        mock_coords.side_effect = [
+            self.coordenadas_origem,
+            self.coordenadas_destino,
+        ]
+        mock_viagens.return_value = []
+
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+        )
+
+        self.assertTrue(resultado["sucesso"])
+        self.assertEqual(resultado["total_opcoes"], 0)
+        self.assertEqual(resultado["viagens"], [])
+        self.assertIn("Nenhuma opção de viagem encontrada", resultado.get("mensagem", ""))
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_origem_nao_encontrada(self, mock_coords):
+        """
+        Verifica o tratamento quando o endereço de origem não é localizado pelo Nominatim.
+        """
+        mock_coords.return_value = {"erro": "Endereço não encontrado."}
+
+        resultado = consultar_viagens(origem="Local Inexistente 123", destino="UFPE")
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "endereco_nao_encontrado")
+        self.assertEqual(resultado["campo"], "origem")
+        self.assertIn("Origem", resultado["erro"])
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_destino_nao_encontrado(self, mock_coords):
+        """
+        Verifica o tratamento quando a origem é encontrada mas o destino não é localizado.
+        """
+        mock_coords.side_effect = [
+            self.coordenadas_origem,
+            {"erro": "Endereço não encontrado."},
+        ]
+
+        resultado = consultar_viagens(origem="Boa Vista", destino="Destino Desconhecido")
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "endereco_nao_encontrado")
+        self.assertEqual(resultado["campo"], "destino")
+        self.assertIn("Destino", resultado["erro"])
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_falha_geocodificacao(self, mock_coords):
+        """
+        Verifica o tratamento quando a chamada ao Nominatim falha por erro de rede/serviço.
+        """
+        mock_coords.side_effect = Exception("Timeout no serviço de geocodificação")
+
+        resultado = consultar_viagens(origem="Boa Vista", destino="UFPE")
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "falha_geocodificacao")
+        self.assertEqual(resultado["erro"], "Não foi possível localizar a origem.")
+        self.assertNotIn("Timeout no serviço", resultado["erro"])
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_coordenadas_invalidas(self, mock_coords):
+        mock_coords.side_effect = [
+            {"latitude": "invalida", "longitude": -34.8872},
+            self.coordenadas_destino,
+        ]
+
+        resultado = consultar_viagens(origem="Boa Vista", destino="UFPE")
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "coordenadas_invalidas")
+        self.assertEqual(resultado["campo"], "origem")
+
+    def test_consultar_viagens_data_ou_horario_invalido(self):
+        """
+        Verifica que dados incorretos de data e horário retornam erro tratado sem exceções não capturadas.
+        """
+        res_data = consultar_viagens(origem="A", destino="B", data="data_invalida")
+        self.assertFalse(res_data["sucesso"])
+        self.assertEqual(res_data["tipo_erro"], "data_invalida")
+
+        res_horario = consultar_viagens(origem="A", destino="B", horario="horario_invalido")
+        self.assertFalse(res_horario["sucesso"])
+        self.assertEqual(res_horario["tipo_erro"], "horario_invalido")
+
+    def test_consultar_viagens_origem_destino_vazios(self):
+        """
+        Verifica a rejeição quando origem ou destino não são informados.
+        """
+        res_origem = consultar_viagens(origem="", destino="UFPE")
+        self.assertFalse(res_origem["sucesso"])
+        self.assertEqual(res_origem["tipo_erro"], "origem_obrigatoria")
+
+        res_destino = consultar_viagens(origem="Boa Vista", destino="   ")
+        self.assertFalse(res_destino["sucesso"])
+        self.assertEqual(res_destino["tipo_erro"], "destino_obrigatorio")
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_preferencias_invalidas_nao_geocodifica(
+        self,
+        mock_coords,
+    ):
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+            preferencias=["evitar_baldeacoes"],
+        )
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "preferencias_invalidas")
+        mock_coords.assert_not_called()
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_preferencias_booleanas_invalidas(self, mock_coords):
+        for nome_preferencia in (
+            "evitar_baldeacoes",
+            "ar_condicionado",
+            "mais_rapido",
+            "menor_caminhada",
+            "permitir_integracao",
+        ):
+            with self.subTest(preferencia=nome_preferencia):
+                resultado = consultar_viagens(
+                    origem="Boa Vista",
+                    destino="UFPE",
+                    preferencias={nome_preferencia: "false"},
+                )
+
+                self.assertFalse(resultado["sucesso"])
+                self.assertEqual(
+                    resultado["tipo_erro"],
+                    "preferencias_invalidas",
+                )
+
+        mock_coords.assert_not_called()
+
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_rejeita_conflito_de_integracao(self, mock_coords):
+        resultado = consultar_viagens(
+            origem="Boa Vista",
+            destino="UFPE",
+            preferencias={
+                "evitar_baldeacoes": True,
+                "permitir_integracao": True,
+            },
+        )
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "preferencias_invalidas")
+        self.assertIn("incompatíveis", resultado["erro"])
+        mock_coords.assert_not_called()
+
+    @patch("ia.rotas_service.buscar_viagens")
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_rejeita_retorno_gtfs_invalido(
+        self,
+        mock_coords,
+        mock_viagens,
+    ):
+        mock_coords.side_effect = [
+            self.coordenadas_origem,
+            self.coordenadas_destino,
+        ]
+        mock_viagens.return_value = {"viagens": []}
+
+        resultado = consultar_viagens(origem="Boa Vista", destino="UFPE")
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "retorno_gtfs_invalido")
+        self.assertNotIn("viagens", resultado)
+
+    @patch("ia.rotas_service.buscar_viagens")
+    @patch("ia.rotas_service.buscar_coordenadas")
+    def test_consultar_viagens_erro_gtfs(self, mock_coords, mock_viagens):
+        """
+        Verifica o tratamento quando o leitor GTFS dispara ErroGTFS.
+        """
+        mock_coords.side_effect = [
+            self.coordenadas_origem,
+            self.coordenadas_destino,
+        ]
+        mock_viagens.side_effect = ErroGTFS("Arquivo stop_times.txt corrompido.")
+
+        resultado = consultar_viagens(origem="Boa Vista", destino="UFPE")
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "erro_gtfs")
+        self.assertIn("GTFS", resultado["erro"])
+
+    # 4. Testes de consultar_linha
+    @patch("ia.rotas_service.buscar_itinerario")
+    @patch("ia.rotas_service.buscar_linha")
+    def test_consultar_linha_sucesso_com_itinerario(self, mock_linha, mock_itinerario):
+        """
+        Verifica a consulta bem-sucedida de linha e seu respectivo itinerário.
+        """
+        linha_mock = {
+            "route_id": "1",
+            "route_short_name": "202",
+            "route_long_name": "TI Barro / TI Macaxeira",
+        }
+        itinerario_mock = {
+            "linha": "202",
+            "nome": "TI Barro / TI Macaxeira",
+            "sentido": "0",
+            "paradas": [{"nome": "Terminal do Barro"}],
+        }
+
+        mock_linha.return_value = linha_mock
+        mock_itinerario.return_value = itinerario_mock
+
+        resultado = consultar_linha("202", sentido="0")
+
+        self.assertTrue(resultado["sucesso"])
+        self.assertEqual(resultado["linha"], linha_mock)
+        self.assertEqual(resultado["itinerario"], itinerario_mock)
+        mock_linha.assert_called_once_with("202")
+        mock_itinerario.assert_called_once_with("202", sentido="0")
+
+    @patch("ia.rotas_service.buscar_linha")
+    def test_consultar_linha_inexistente(self, mock_linha):
+        """
+        Verifica o tratamento quando a linha não existe no GTFS.
+        """
+        mock_linha.return_value = None
+
+        resultado = consultar_linha("99999")
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "linha_nao_encontrada")
+        self.assertIsNone(resultado["linha"])
+        self.assertIsNone(resultado["itinerario"])
+        self.assertIn("não encontrada", resultado["erro"])
+
+    @patch("ia.rotas_service.buscar_itinerario")
+    @patch("ia.rotas_service.buscar_linha")
+    def test_consultar_linha_itinerario_indisponivel(self, mock_linha, mock_itinerario):
+        """
+        Verifica o comportamento quando a linha existe mas o itinerário não está disponível.
+        """
+        linha_mock = {
+            "route_id": "1",
+            "route_short_name": "202",
+            "route_long_name": "TI Barro / TI Macaxeira",
+        }
+        mock_linha.return_value = linha_mock
+        mock_itinerario.return_value = None
+
+        resultado = consultar_linha("202", sentido="1")
+
+        self.assertTrue(resultado["sucesso"])
+        self.assertEqual(resultado["linha"], linha_mock)
+        self.assertIsNone(resultado["itinerario"])
+        self.assertIn("Itinerário não disponível", resultado.get("aviso", ""))
+
+    @patch("ia.rotas_service.buscar_linha")
+    def test_consultar_linha_erro_gtfs(self, mock_linha):
+        """
+        Verifica o tratamento de ErroGTFS durante a consulta de linha.
+        """
+        mock_linha.side_effect = ErroGTFS("Falha ao abrir routes.txt")
+
+        resultado = consultar_linha("202")
+
+        self.assertFalse(resultado["sucesso"])
+        self.assertEqual(resultado["tipo_erro"], "erro_gtfs")
+
+    def test_consultar_linha_codigo_vazio(self):
+        """
+        Verifica a validação de código vazio ou nulo na consulta de linha.
+        """
+        self.assertFalse(consultar_linha("")["sucesso"])
+        self.assertFalse(consultar_linha(None)["sucesso"])
 
 
 

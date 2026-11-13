@@ -5,18 +5,6 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-export interface RespostaIA {
-  intencao: 'buscar_rota' | 'consultar_linha' | 'saudacao' | 'outro';
-  origem: string | null;
-  destino: string | null;
-  data: string | null;
-  horario: string | null;
-  preferencias: Record<string, unknown>;
-  informacoes_faltantes: string[];
-  mensagem: string;
-  erro?: string;
-}
-
 export interface ParadaTrecho {
   id: string;
   nome: string;
@@ -113,29 +101,6 @@ export interface RespostaTodasParadas {
     longitude: number;
   }>;
   erro?: string;
-}
-
-/**
- * Consulta o assistente de IA para interpretar mensagens em linguagem natural.
- */
-export async function consultarIA(mensagem: string): Promise<RespostaIA> {
-  const url = `${API_BASE_URL}/api/ia/consultar/`;
-
-  const resposta = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ mensagem }),
-  });
-
-  const dados = await resposta.json();
-
-  if (!resposta.ok) {
-    throw new Error(dados.erro || 'Falha ao consultar o assistente de IA.');
-  }
-
-  return dados as RespostaIA;
 }
 
 /**
