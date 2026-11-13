@@ -59,9 +59,20 @@
 
     <div class="controles">
         <label for="linha">Código da linha:</label>
-        <input id="linha" value="013">
+        <input id="linha" placeholder="Digite o código da linha">
+
         <button onclick="carregarLinha()">Buscar linha</button>
+
+        <button onclick="obterLocalizacao()">
+            Minha localização
+        </button>
+
         <p id="mensagem">Carregando mapa...</p>
+        <p id="mensagemLocalizacao">Aguardando localização...</p>
+        <div id="paradasProximas">
+            <h3>Paradas próximas de você</h3>
+            <p>Aguardando sua localização...</p>
+        </div>
     </div>
 
     <div id="mapa"></div>
@@ -79,6 +90,177 @@
 
         // Marcadores das paradas da linha selecionada
         let marcadores = L.layerGroup().addTo(mapa);
+
+        // Variáveis da localização do usuário
+        let marcadorUsuario = null;
+        let circuloPrecisao = null;
+        let acompanhamentoAtivo = false;
+        let idAcompanhamento = null;
+
+
+        // Obtém e acompanha a localização do usuário
+        window.obterLocalizacao = function() {
+
+            const mensagemLocalizacao = document.getElementById('mensagemLocalizacao');
+
+            if (!navigator.geolocation) {
+                mensagemLocalizacao.textContent =
+                    'Seu navegador não suporta geolocalização.';
+                return;
+            }
+
+            // Evita criar vários acompanhamentos simultâneos
+            if (idAcompanhamento !== null) {
+                navigator.geolocation.clearWatch(idAcompanhamento);
+            }
+
+            mensagemLocalizacao.textContent = 'Obtendo sua localização...';
+
+            idAcompanhamento = navigator.geolocation.watchPosition(
+
+                function(posicao) {
+                    const latitude = posicao.coords.latitude;
+                    const longitude = posicao.coords.longitude;
+                    const precisao = posicao.coords.accuracy;
+
+                    const coordenadas = [latitude, longitude];
+                    atualizarParadasProximas(latitude, longitude);
+
+                    // Cria ou atualiza o marcador do usuário
+                    if (marcadorUsuario === null) {
+                        marcadorUsuario = L.circleMarker(coordenadas, {
+                            radius: 9,
+                            color: '#ffffff',
+                            weight: 3,
+                            fillColor: '#1976d2',
+                            fillOpacity: 1
+                        }).addTo(mapa);
+
+                        marcadorUsuario.bindPopup('Você está aqui!');
+
+                        // Centraliza o mapa na primeira localização encontrada
+                        mapa.setView(coordenadas, 16);
+
+                    } else {
+                        marcadorUsuario.setLatLng(coordenadas);
+                    }
+
+                    // Cria ou atualiza o círculo de precisão
+                    if (circuloPrecisao === null) {
+                        circuloPrecisao = L.circle(coordenadas, {
+                            radius: precisao,
+                            color: '#1976d2',
+                            fillColor: '#1976d2',
+                            fillOpacity: 0.12,
+                            weight: 1
+                        }).addTo(mapa);
+
+                    } else {
+                        circuloPrecisao.setLatLng(coordenadas);
+                        circuloPrecisao.setRadius(precisao);
+                    }
+
+                    acompanhamentoAtivo = true;
+
+                    mensagemLocalizacao.textContent =
+                        'Localização atualizada. Precisão aproximada: ' +
+                        Math.round(precisao) + ' metros.';
+                },
+
+        function(error) {
+
+            acompanhamentoAtivo = false;
+
+            const mensagens = {
+                1: 'Permissão de localização negada. Autorize o acesso no navegador.',
+                2: 'Não foi possível determinar sua posição. Verifique o GPS ou a conexão.',
+                3: 'A localização demorou demais. Tente novamente.'
+            };
+
+            mensagemLocalizacao.textContent =
+                mensagens[error.code] || 'Erro ao obter sua localização.';
+
+            console.error('Erro de geolocalização:', error);
+        },
+
+        {
+            enableHighAccuracy: true,
+            maximumAge: 5000,
+            timeout: 20000
+        }
+    );
+};
+
+        // Calcula a distância entre duas coordenadas em metros
+function calcularDistancia(lat1, lon1, lat2, lon2) {
+
+    const raioTerra = 6371000;
+
+    const rad = angulo => angulo * Math.PI / 180;
+
+    const diferencaLat = rad(lat2 - lat1);
+    const diferencaLon = rad(lon2 - lon1);
+
+    const a =
+        Math.sin(diferencaLat / 2) ** 2 +
+        Math.cos(rad(lat1)) *
+        Math.cos(rad(lat2)) *
+        Math.sin(diferencaLon / 2) ** 2;
+
+    return raioTerra * 2 * Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+    );
+}
+
+
+// Encontra e exibe as cinco paradas mais próximas
+function atualizarParadasProximas(latitude, longitude) {
+
+    const container = document.getElementById('paradasProximas');
+
+    if (todasParadas.length === 0) {
+        container.textContent = 'Carregando paradas do transporte público...';
+        return;
+    }
+
+    const proximas = todasParadas
+        .filter(parada =>
+            Number.isFinite(Number(parada.latitude)) &&
+            Number.isFinite(Number(parada.longitude))
+        )
+        .map(parada => ({
+            ...parada,
+            distancia: calcularDistancia(
+                latitude,
+                longitude,
+                Number(parada.latitude),
+                Number(parada.longitude)
+            )
+        }))
+        .sort((a, b) => a.distancia - b.distancia)
+        .slice(0, 5);
+
+    container.replaceChildren();
+
+    const titulo = document.createElement('h3');
+    titulo.textContent = 'Paradas próximas de você';
+    container.appendChild(titulo);
+
+    proximas.forEach(parada => {
+
+        const item = document.createElement('p');
+
+        const distancia = parada.distancia < 1000
+            ? `${Math.round(parada.distancia)} metros`
+            : `${(parada.distancia / 1000).toFixed(2)} km`;
+
+        item.textContent = `${parada.nome} — ${distancia}`;
+
+        container.appendChild(item);
+    });
+}
+
 
         // Todas as paradas do GTFS
         let todasParadas = [];
@@ -134,8 +316,14 @@
 
         // Busca e exibe o itinerário de uma linha
         async function carregarLinha() {
-            const codigo = document.getElementById('linha').value;
+            const codigo = document.getElementById('linha').value.trim();
             const mensagem = document.getElementById('mensagem');
+
+            // Impede pesquisa vazia
+            if (!codigo) {
+                mensagem.textContent = 'Digite o código de uma linha para pesquisar.';
+                return;
+            }
 
             mensagem.textContent = 'Buscando itinerário...';
 
@@ -200,13 +388,23 @@
         carregarTodasParadas()
             .then(() => {
                 atualizarParadasVisiveis();
+
+                if (marcadorUsuario !== null) {
+                    const posicao = marcadorUsuario.getLatLng();
+
+                    atualizarParadasProximas(
+                        posicao.lat,
+                        posicao.lng
+                    );
+                }
             })
             .catch(erro => {
                 console.error('Erro ao carregar paradas:', erro);
             });
 
-        // Carrega a linha inicial
-        carregarLinha();
+
+        // Inicia o acompanhamento da localização
+        obterLocalizacao();
 
     </script>
 
