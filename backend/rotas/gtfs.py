@@ -144,10 +144,15 @@ def _carregar_dados():
     for pontos in shapes_por_id.values():
         pontos.sort(key=lambda item: item["ordem"])
 
-    calendario = {
-        registro["service_id"]: registro
-        for registro in _ler_csv("calendar.txt", obrigatorio=False)
-    }
+    calendario = {}
+    for registro in _ler_csv("calendar.txt", obrigatorio=False):
+        try:
+            registro["_inicio"] = datetime.strptime(registro["start_date"], "%Y%m%d").date()
+            registro["_fim"] = datetime.strptime(registro["end_date"], "%Y%m%d").date()
+        except (KeyError, ValueError):
+            registro["_inicio"] = None
+            registro["_fim"] = None
+        calendario[registro["service_id"]] = registro
 
     excecoes_calendario = defaultdict(dict)
     for registro in _ler_csv(
@@ -259,12 +264,15 @@ def servico_ativo(service_id, data_viagem):
     if not calendario:
         return False
 
-    inicio = datetime.strptime(
-        calendario["start_date"], "%Y%m%d"
-    ).date()
-    fim = datetime.strptime(
-        calendario["end_date"], "%Y%m%d"
-    ).date()
+    inicio = calendario.get("_inicio")
+    fim = calendario.get("_fim")
+
+    if not inicio or not fim:
+        try:
+            inicio = datetime.strptime(calendario["start_date"], "%Y%m%d").date()
+            fim = datetime.strptime(calendario["end_date"], "%Y%m%d").date()
+        except (KeyError, ValueError):
+            return False
 
     dia_semana = (
         "monday", "tuesday", "wednesday",
@@ -490,12 +498,12 @@ def _buscar_segmentos(
         for trip_id, _ in dados["viagens_por_parada"].get(stop_id, []):
             viagens_candidatas.add(trip_id)
 
-    # Calcula os serviços ativos uma vez por busca, não uma vez por viagem.
+    # Calcula os serviços ativos apenas para as viagens candidatas
     servicos_ativos = {
-        viagem["service_id"]
-        for trip_id, viagem in dados["viagens"].items()
-        if trip_id in viagens_candidatas
-        and servico_ativo(viagem["service_id"], data_objeto)
+        dados["viagens"][trip_id]["service_id"]
+        for trip_id in viagens_candidatas
+        if trip_id in dados["viagens"]
+        and servico_ativo(dados["viagens"][trip_id]["service_id"], data_objeto)
     }
 
     for trip_id in viagens_candidatas:
@@ -678,64 +686,99 @@ def buscar_viagens(
     ]
 
     if permitir_integracao:
-        # Para a primeira perna, aceitamos qualquer parada como possível
-        # ponto de integração. A segunda perna deve sair dessa mesma parada.
-        todas_paradas = list(dados["paradas"].values())
+        ids_origem = {p["id"] for p in origem}
+        ids_destino = {p["id"] for p in destino}
 
-        primeira_perna = _buscar_segmentos(
-            origem, todas_paradas, data_objeto, horario_minutos
-        )
+        # 1. Identifica viagens da origem e paradas alcançáveis
+        viagens_origem = set()
+        for stop_id in ids_origem:
+            for trip_id, _ in dados["viagens_por_parada"].get(stop_id, []):
+                viagens_origem.add(trip_id)
 
-        # Mantém apenas algumas chegadas promissoras por parada de integração.
-        primeiras_por_parada = defaultdict(list)
+        paradas_origem_alcancaveis = set()
+        for trip_id in viagens_origem:
+            registros = dados["horarios_por_viagem"].get(trip_id, [])
+            achou_embarque = False
+            for r in registros:
+                if achou_embarque:
+                    paradas_origem_alcancaveis.add(r["stop_id"])
+                elif r["stop_id"] in ids_origem:
+                    achou_embarque = True
 
-        for segmento in primeira_perna:
-            primeiras_por_parada[
-                segmento["stop_desembarque"]
-            ].append(segmento)
+        # 2. Identifica viagens do destino e paradas acessíveis
+        viagens_destino = set()
+        for stop_id in ids_destino:
+            for trip_id, _ in dados["viagens_por_parada"].get(stop_id, []):
+                viagens_destino.add(trip_id)
 
-        for segmentos in primeiras_por_parada.values():
-            segmentos.sort(key=lambda item: item["chegada_minutos"])
-            del segmentos[3:]
+        paradas_destino_acessiveis = set()
+        for trip_id in viagens_destino:
+            registros = dados["horarios_por_viagem"].get(trip_id, [])
+            for r in registros:
+                if r["stop_id"] in ids_destino:
+                    break
+                paradas_destino_acessiveis.add(r["stop_id"])
 
-        # Procura a segunda perna a partir das paradas alcançadas.
-        for parada_integracao, primeiras in primeiras_por_parada.items():
-            horario_mais_cedo = min(
-                item["chegada_minutos"] + tempo_minimo_integracao
-                for item in primeiras
+        # 3. Apenas paradas da interseção exata são avaliadas
+        paradas_integracao_ids = paradas_origem_alcancaveis.intersection(paradas_destino_acessiveis)
+        paradas_integracao_candidatas = [
+            dados["paradas"][sid]
+            for sid in paradas_integracao_ids
+            if sid in dados["paradas"]
+        ]
+
+        if paradas_integracao_candidatas:
+            # 4. Primeira perna: da origem até as paradas de integração candidatas
+            primeira_perna = _buscar_segmentos(
+                origem, paradas_integracao_candidatas, data_objeto, horario_minutos
             )
 
-            segunda_perna = _buscar_segmentos(
-                [dados["paradas"][parada_integracao]],
-                destino,
-                data_objeto,
-                horario_mais_cedo,
-            )
+            primeiras_por_parada = defaultdict(list)
+            for segmento in primeira_perna:
+                primeiras_por_parada[
+                    segmento["stop_desembarque"]
+                ].append(segmento)
 
-            segundas_por_trip = defaultdict(list)
-            for segmento in segunda_perna:
-                segundas_por_trip[segmento["trip_id"]].append(segmento)
+            for segmentos in primeiras_por_parada.values():
+                segmentos.sort(key=lambda item: item["chegada_minutos"])
+                del segmentos[3:]
 
-            for primeira in primeiras:
-                horario_disponivel = (
-                    primeira["chegada_minutos"]
-                    + tempo_minimo_integracao
+            paradas_ativas = [
+                dados["paradas"][sid]
+                for sid in primeiras_por_parada.keys()
+                if sid in dados["paradas"]
+            ]
+
+            # 5. Segunda perna: busca em chamada unificada para todas as paradas ativas
+            if paradas_ativas:
+                horario_minimo_segunda = min(
+                    (s["chegada_minutos"] + tempo_minimo_integracao for s in primeira_perna),
+                    default=horario_minutos,
                 )
 
-                for segmentos in segundas_por_trip.values():
-                    for segunda in segmentos:
-                        if segunda["trip_id"] == primeira["trip_id"]:
-                            continue
+                segunda_perna = _buscar_segmentos(
+                    paradas_ativas, destino, data_objeto, horario_minimo_segunda
+                )
 
-                        if segunda["stop_embarque"] != parada_integracao:
-                            continue
+                segundas_por_parada_trip = defaultdict(lambda: defaultdict(list))
+                for segmento in segunda_perna:
+                    segundas_por_parada_trip[segmento["stop_embarque"]][segmento["trip_id"]].append(segmento)
 
-                        if segunda["saida_minutos"] < horario_disponivel:
-                            continue
-
-                        opcoes.append(
-                            _montar_opcao_integracao(primeira, segunda)
+                for parada_integracao, primeiras in primeiras_por_parada.items():
+                    trips_segunda = segundas_por_parada_trip.get(parada_integracao, {})
+                    for primeira in primeiras:
+                        horario_disponivel = (
+                            primeira["chegada_minutos"] + tempo_minimo_integracao
                         )
+
+                        for trip_id, segmentos in trips_segunda.items():
+                            if trip_id == primeira["trip_id"]:
+                                continue
+                            for segunda in segmentos:
+                                if segunda["saida_minutos"] >= horario_disponivel:
+                                    opcoes.append(
+                                        _montar_opcao_integracao(primeira, segunda)
+                                    )
 
     # Remove duplicações e prioriza chegada mais cedo, caminhada menor
     # e menos integrações.

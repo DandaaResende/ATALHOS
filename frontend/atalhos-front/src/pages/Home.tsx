@@ -375,16 +375,42 @@ export function Home() {
 
         setOrigemTexto(novaOrigemNome);
         setDestinoTexto(novoDestinoNome);
-        setBuscandoRota(true);
 
         if (novaOrigemNome && novoDestinoNome) {
+          setBuscandoRota(true);
           await selecionarAtalho(novaOrigemNome, novoDestinoNome);
+        } else if (novoDestinoNome) {
+          // Destino identificado pela IA: localiza coordenadas e exibe no mapa
+          setBuscandoRota(true);
+          try {
+            const sugestoesDestino = await buscarSugestoesLocais(novoDestinoNome);
+            if (sugestoesDestino.length > 0) {
+              setDestinoLocal(sugestoesDestino[0]);
+            }
+          } catch {
+            // Mantém apenas o texto
+          }
+        } else if (novaOrigemNome) {
+          // Origem identificada pela IA
+          setBuscandoRota(true);
+          try {
+            const sugestoesOrigem = await buscarSugestoesLocais(novaOrigemNome);
+            if (sugestoesOrigem.length > 0) {
+              setOrigemLocal(sugestoesOrigem[0]);
+            }
+          } catch {
+            // Mantém apenas o texto
+          }
+        } else {
+          // Solicitação incompleta ou ambígua
+          setBuscandoRota(false);
         }
       } else {
         setRespostaIAMensagem(resposta.mensagem || 'Como posso te ajudar com seu trajeto hoje?');
       }
     } catch (erro: any) {
       console.warn('Assistente de IA indisponível, abrindo busca padrão:', erro);
+      setRespostaIAMensagem('Não foi possível consultar o assistente no momento. Você pode pesquisar os locais diretamente nos campos abaixo.');
       setBuscandoRota(true);
       setDestinoTexto(texto);
     } finally {
@@ -508,6 +534,24 @@ export function Home() {
           {/* Topo quando está buscando rota (CardSeuTrajeto) e NÃO em acompanhamento */}
           {buscandoRota && !rotaEscolhida && !modoAcompanhamento && (
             <div className="flex flex-col">
+              {/* Mensagem e orientação do assistente de IA quando ativa */}
+              {respostaIAMensagem && (
+                <div className="max-w-md mx-auto w-full px-4 pt-3">
+                  <div className="relative bg-white/95 backdrop-blur border border-indigo-100 shadow-md rounded-2xl p-3.5 text-xs text-[#05053a] flex items-start justify-between gap-2 animate-fade-in">
+                    <div className="flex items-start gap-2">
+                      <Sparkles className="w-4 h-4 text-lime-600 shrink-0 mt-0.5" />
+                      <p className="font-medium leading-relaxed">{respostaIAMensagem}</p>
+                    </div>
+                    <button
+                      onClick={() => setRespostaIAMensagem(null)}
+                      className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <CardSeuTrajeto
                 origemTexto={origemTexto}
                 destinoTexto={destinoTexto}
