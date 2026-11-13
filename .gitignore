@@ -34,3 +34,6 @@ Thumbs.db
 # Arquivos temporários do Python
 __pycache__/
 *.py[cod]
+
+# React
+node_modules
