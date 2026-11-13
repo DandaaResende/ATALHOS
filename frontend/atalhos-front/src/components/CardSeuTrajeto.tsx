@@ -1,4 +1,4 @@
-import { ArrowLeft, MapPin, ArrowUpDown, Search, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, ArrowUpDown, Search, Loader2, AlertCircle, LocateFixed } from 'lucide-react';
 import { CampoBuscaLocal } from './CampoBuscaLocal';
 import type { SugestaoLocal } from '../services/api';
 
@@ -16,6 +16,8 @@ interface CardSeuTrajetoProps {
   onInverter: () => void;
   onFechar: () => void;
   onPesquisar: () => void;
+  onUsarLocalizacaoAtual?: () => void;
+  carregandoLocalizacao?: boolean;
   carregandoRotas: boolean;
   mensagemValidacao?: string | null;
 }
@@ -34,6 +36,8 @@ export function CardSeuTrajeto({
   onInverter,
   onFechar,
   onPesquisar,
+  onUsarLocalizacaoAtual,
+  carregandoLocalizacao = false,
   carregandoRotas,
   mensagemValidacao,
 }: CardSeuTrajetoProps) {
@@ -60,7 +64,27 @@ export function CardSeuTrajeto({
           <div className="w-5"></div>
         </div>
 
-        <h2 className="text-xl font-bold text-[#05053a] mb-4">Seu trajeto</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xl font-bold text-[#05053a]">Seu trajeto</h2>
+
+          {/* Botão de usar localização atual como origem */}
+          {onUsarLocalizacaoAtual && (
+            <button
+              type="button"
+              onClick={onUsarLocalizacaoAtual}
+              disabled={carregandoLocalizacao}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/80 px-2.5 py-1 rounded-full transition-all cursor-pointer disabled:opacity-50"
+              title="Preencher partida com sua localização GPS"
+            >
+              {carregandoLocalizacao ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+              ) : (
+                <LocateFixed className="w-3.5 h-3.5 text-blue-600" />
+              )}
+              <span>{carregandoLocalizacao ? 'Localizando...' : 'Minha localização'}</span>
+            </button>
+          )}
+        </div>
 
         {/* Inputs de Origem e Destino com ícones e linha pontilhada */}
         <div className="relative flex items-center gap-3">

@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, User, ChevronLeft, Sparkles, X } from 'lucide-react';
+import { Search, User, ChevronLeft, Sparkles, X, AlertCircle } from 'lucide-react';
 import { CardSeuTrajeto } from '../components/CardSeuTrajeto';
 import { CardMaisRotas } from '../components/CardMaisRotas';
 import type { OpcaoRota } from '../components/CardMaisRotas';
 import { CardRotaSelecionada } from '../components/CardRotaSelecionada';
+import { CardAcompanhamento } from '../components/CardAcompanhamento';
+import { MapaInterativo } from '../components/MapaInterativo';
+import { useGeolocalizacao } from '../hooks/useGeolocalizacao';
 import {
   buscarRotas,
   consultarIA,
@@ -15,6 +18,20 @@ import {
 
 export function Home() {
   const navigate = useNavigate();
+
+  // Hook de captura e rastreamento da localização do usuário via GPS
+  const {
+    localizacao: posicaoUsuario,
+    carregando: carregandoLocalizacao,
+    erro: erroLocalizacao,
+    statusRastreamento,
+    obterLocalizacao,
+    iniciarAcompanhamento,
+    pausarAcompanhamento,
+    retomarAcompanhamento,
+    encerrarAcompanhamento,
+    limparErro: limparErroLocalizacao,
+  } = useGeolocalizacao();
 
   // Estados dos locais de origem e destino
   const [origemTexto, setOrigemTexto] = useState('');
@@ -29,6 +46,10 @@ export function Home() {
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
   const [rotas, setRotas] = useState<OpcaoRota[]>([]);
   const [rotaEscolhida, setRotaEscolhida] = useState<OpcaoRota | null>(null);
+
+  // Estados do acompanhamento em tempo real
+  const [modoAcompanhamento, setModoAcompanhamento] = useState(false);
+  const [seguindoUsuario, setSeguindoUsuario] = useState(true);
 
   // Estado para busca com o assistente inteligente (IA)
   const [mensagemIA, setMensagemIA] = useState('');
@@ -92,6 +113,11 @@ export function Home() {
       });
 
       setRotas(opcoesFormatadas);
+
+      // Se houver rotas, seleciona a primeira por padrão para já exibir no mapa
+      if (opcoesFormatadas.length > 0) {
+        setRotaEscolhida(opcoesFormatadas[0]);
+      }
     } catch (erro: any) {
       console.error('Erro ao buscar rotas no backend:', erro);
       setMensagemErro(
@@ -123,7 +149,6 @@ export function Home() {
 
     setMensagemValidacao(null);
 
-    // Se o usuário digitou sem selecionar a sugestão, tenta resolver automaticamente o local mais próximo
     let localOrigemFinal = origemLocal;
     let localDestinoFinal = destinoLocal;
 
@@ -157,6 +182,63 @@ export function Home() {
     );
   };
 
+  // Preenche a origem automaticamente com a localização atual do GPS
+  const handleUsarLocalizacaoComoOrigem = () => {
+    obterLocalizacao((coords) => {
+      const localGps: SugestaoLocal = {
+        id: 'gps-origem',
+        nome: 'Minha localização atual',
+        descricao: 'Posição identificada via GPS do dispositivo',
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      };
+      setOrigemLocal(localGps);
+      setOrigemTexto('Minha localização atual');
+      setMensagemValidacao(null);
+
+      if (destinoLocal) {
+        executarBuscaRotas(
+          { nome: 'Minha localização atual', local: localGps },
+          { nome: destinoLocal.nome, local: destinoLocal }
+        );
+      }
+    });
+  };
+
+  // Inicia o acompanhamento em tempo real da rota selecionada
+  const handleIniciarAcompanhamento = (rota: OpcaoRota) => {
+    setRotaEscolhida(rota);
+    setModoAcompanhamento(true);
+    setSeguindoUsuario(true);
+    iniciarAcompanhamento();
+  };
+
+  // Pausa o acompanhamento
+  const handlePausarAcompanhamento = () => {
+    pausarAcompanhamento();
+  };
+
+  // Retoma o acompanhamento
+  const handleRetomarAcompanhamento = () => {
+    retomarAcompanhamento();
+    setSeguindoUsuario(true);
+  };
+
+  // Encerra o acompanhamento e retorna à visualização da rota
+  const handleEncerrarAcompanhamento = () => {
+    encerrarAcompanhamento();
+    setModoAcompanhamento(false);
+    setSeguindoUsuario(false);
+  };
+
+  // Centraliza o mapa na posição do usuário
+  const handleCentralizarUsuario = () => {
+    setSeguindoUsuario(true);
+    if (!posicaoUsuario) {
+      obterLocalizacao();
+    }
+  };
+
   // Seleção de local na lista de sugestões de Origem
   const handleSelecionarOrigem = (local: SugestaoLocal) => {
     setOrigemLocal(local);
@@ -164,7 +246,6 @@ export function Home() {
     setMensagemValidacao(null);
     setRotaEscolhida(null);
 
-    // Se o destino já estiver selecionado, pesquisa automaticamente
     if (destinoLocal) {
       executarBuscaRotas(
         { nome: local.nome, local },
@@ -180,7 +261,6 @@ export function Home() {
     setMensagemValidacao(null);
     setRotaEscolhida(null);
 
-    // Se a origem já estiver selecionada, pesquisa automaticamente
     if (origemLocal) {
       executarBuscaRotas(
         { nome: origemLocal.nome, local: origemLocal },
@@ -189,7 +269,6 @@ export function Home() {
     }
   };
 
-  // Limpa o local de origem se o usuário alterar o texto manualmente
   const handleChangeOrigemTexto = (texto: string) => {
     setOrigemTexto(texto);
     setOrigemLocal(null);
@@ -197,7 +276,6 @@ export function Home() {
     setMensagemValidacao(null);
   };
 
-  // Limpa o local de destino se o usuário alterar o texto manualmente
   const handleChangeDestinoTexto = (texto: string) => {
     setDestinoTexto(texto);
     setDestinoLocal(null);
@@ -205,7 +283,6 @@ export function Home() {
     setMensagemValidacao(null);
   };
 
-  // Inverte os locais de partida e destino (incluindo texto e coordenadas)
   const inverterTrajeto = () => {
     const novoOrigemTexto = destinoTexto;
     const novoDestinoTexto = origemTexto;
@@ -228,6 +305,8 @@ export function Home() {
   };
 
   const fecharBusca = () => {
+    encerrarAcompanhamento();
+    setModoAcompanhamento(false);
     setBuscandoRota(false);
     setOrigemTexto('');
     setDestinoTexto('');
@@ -241,7 +320,6 @@ export function Home() {
     setRespostaIAMensagem(null);
   };
 
-  // Seleciona um atalho sugerido pré-definido
   const selecionarAtalho = async (origemNome: string, destinoNome: string) => {
     setOrigemTexto(origemNome);
     setDestinoTexto(destinoNome);
@@ -273,7 +351,6 @@ export function Home() {
     }
   };
 
-  // Consulta por linguagem natural com o assistente de IA
   const handleConsultarIA = async (e: React.FormEvent) => {
     e.preventDefault();
     const texto = mensagemIA.trim();
@@ -317,127 +394,180 @@ export function Home() {
 
   const temCamposPreenchidos = origemTexto.trim().length > 0 && destinoTexto.trim().length > 0;
 
+  // Pontos para exibição no mapa
+  const pontoOrigemMapa = origemLocal
+    ? { latitude: origemLocal.latitude, longitude: origemLocal.longitude, nome: origemLocal.nome }
+    : null;
+
+  const pontoDestinoMapa = destinoLocal
+    ? { latitude: destinoLocal.latitude, longitude: destinoLocal.longitude, nome: destinoLocal.nome }
+    : null;
+
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-slate-100 flex flex-col justify-between font-sans">
+    <div className="relative w-full h-screen overflow-hidden font-sans">
       
-      {/* 1. HEADER INICIAL COM BUSCA INTELIGENTE */}
-      {!buscandoRota && (
-        <header className="relative z-10 w-full p-4 flex flex-col gap-3 max-w-md mx-auto">
-          <div className="flex items-center gap-3">
-            <form
-              onSubmit={handleConsultarIA}
-              className="flex-1 flex items-center bg-[#05053a] text-white rounded-full px-4 py-2.5 shadow-lg active:scale-[0.99] transition-transform"
-            >
-              <Search className="w-5 h-5 text-gray-300 mr-2.5 shrink-0" />
-              <input
-                type="text"
-                value={mensagemIA}
-                onChange={(e) => setMensagemIA(e.target.value)}
-                placeholder="Busque local, linha ou pergunte à IA..."
-                className="w-full bg-transparent border-none outline-none text-sm text-white placeholder-gray-300 font-medium"
-              />
-              <button
-                type="submit"
-                disabled={consultandoIA}
-                title="Consultar com IA"
-                className="p-1 rounded-full text-lime-300 hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {consultandoIA ? (
-                  <div className="w-5 h-5 border-2 border-lime-300 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <Sparkles className="w-5 h-5" />
-                )}
-              </button>
-            </form>
+      {/* 1. MAPA INTERATIVO NO FUNDO */}
+      <div className="absolute inset-0 w-full h-full z-0">
+        <MapaInterativo
+          posicaoUsuario={posicaoUsuario}
+          pontoOrigem={pontoOrigemMapa}
+          pontoDestino={pontoDestinoMapa}
+          rotaSelecionada={rotaEscolhida}
+          onLocalizarUsuario={handleCentralizarUsuario}
+          carregandoLocalizacao={carregandoLocalizacao}
+          seguindoUsuario={seguindoUsuario}
+          onUsuarioArrastouMapa={() => setSeguindoUsuario(false)}
+          modoAcompanhamento={modoAcompanhamento}
+        />
+      </div>
 
-            <button
-              onClick={() => navigate('/perfil')}
-              className="w-12 h-12 rounded-full bg-[#05053a] text-white flex items-center justify-center shadow-lg shrink-0 border-2 border-indigo-900 overflow-hidden active:scale-95 transition-transform cursor-pointer"
-              title="Meu perfil"
-            >
-              <User className="w-6 h-6 text-indigo-200" />
-            </button>
-          </div>
+      {/* Camada flutuante de conteúdo (com pointer-events transparentes nas áreas livres do mapa) */}
+      <div className="relative z-10 w-full h-full flex flex-col justify-between pointer-events-none">
+        
+        {/* TOPO: HEADER INICIAL OU CARD DE TRAJETO OU BARRA DE NAVEGAÇÃO ATIVA */}
+        <div className="w-full pointer-events-auto">
+          {/* Header inicial quando não estiver na busca expandida nem em navegação */}
+          {!buscandoRota && !modoAcompanhamento && (
+            <header className="w-full p-4 flex flex-col gap-3 max-w-md mx-auto">
+              <div className="flex items-center gap-3">
+                <form
+                  onSubmit={handleConsultarIA}
+                  className="flex-1 flex items-center bg-[#05053a] text-white rounded-full px-4 py-2.5 shadow-xl active:scale-[0.99] transition-transform"
+                >
+                  <Search className="w-5 h-5 text-gray-300 mr-2.5 shrink-0" />
+                  <input
+                    type="text"
+                    value={mensagemIA}
+                    onChange={(e) => setMensagemIA(e.target.value)}
+                    placeholder="Busque local, linha ou pergunte à IA..."
+                    className="w-full bg-transparent border-none outline-none text-sm text-white placeholder-gray-300 font-medium"
+                  />
+                  <button
+                    type="submit"
+                    disabled={consultandoIA}
+                    title="Consultar com IA"
+                    className="p-1 rounded-full text-lime-300 hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {consultandoIA ? (
+                      <div className="w-5 h-5 border-2 border-lime-300 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <Sparkles className="w-5 h-5" />
+                    )}
+                  </button>
+                </form>
 
-          {/* Resposta do assistente de IA se houver */}
-          {respostaIAMensagem && (
-            <div className="relative bg-white/95 backdrop-blur border border-indigo-100 shadow-md rounded-2xl p-3.5 text-xs text-[#05053a] flex items-start justify-between gap-2 animate-fade-in">
-              <div className="flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-lime-600 shrink-0 mt-0.5" />
-                <p className="font-medium leading-relaxed">{respostaIAMensagem}</p>
+                <button
+                  onClick={() => navigate('/perfil')}
+                  className="w-12 h-12 rounded-full bg-[#05053a] text-white flex items-center justify-center shadow-xl shrink-0 border-2 border-indigo-900 overflow-hidden active:scale-95 transition-transform cursor-pointer"
+                  title="Meu perfil"
+                >
+                  <User className="w-6 h-6 text-indigo-200" />
+                </button>
               </div>
+
+              {/* Resposta do assistente de IA se houver */}
+              {respostaIAMensagem && (
+                <div className="relative bg-white/95 backdrop-blur border border-indigo-100 shadow-md rounded-2xl p-3.5 text-xs text-[#05053a] flex items-start justify-between gap-2 animate-fade-in">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 text-lime-600 shrink-0 mt-0.5" />
+                    <p className="font-medium leading-relaxed">{respostaIAMensagem}</p>
+                  </div>
+                  <button
+                    onClick={() => setRespostaIAMensagem(null)}
+                    className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Botão rápido para abrir busca ou sugestões conhecidas */}
+              <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none text-xs">
+                <button
+                  onClick={() => setBuscandoRota(true)}
+                  className="px-3.5 py-1.5 rounded-full bg-[#05053a] text-lime-300 font-bold shadow-md hover:brightness-110 active:scale-95 transition-all shrink-0 cursor-pointer"
+                >
+                  Planejar Trajeto
+                </button>
+                <button
+                  onClick={() => selecionarAtalho('Shopping Recife', 'Marco Zero')}
+                  className="px-3 py-1.5 rounded-full bg-white/95 text-[#05053a] font-medium shadow-md hover:shadow-lg active:scale-95 transition-all shrink-0 cursor-pointer border border-slate-200"
+                >
+                  Shopping Recife ➔ Marco Zero
+                </button>
+                <button
+                  onClick={() => selecionarAtalho('Universidade Federal de Pernambuco', 'Derby, Recife')}
+                  className="px-3 py-1.5 rounded-full bg-white/95 text-[#05053a] font-medium shadow-md hover:shadow-lg active:scale-95 transition-all shrink-0 cursor-pointer border border-slate-200"
+                >
+                  UFPE ➔ Derby
+                </button>
+              </div>
+            </header>
+          )}
+
+          {/* Topo quando está buscando rota (CardSeuTrajeto) e NÃO em acompanhamento */}
+          {buscandoRota && !rotaEscolhida && !modoAcompanhamento && (
+            <div className="flex flex-col">
+              <CardSeuTrajeto
+                origemTexto={origemTexto}
+                destinoTexto={destinoTexto}
+                origemLocal={origemLocal}
+                destinoLocal={destinoLocal}
+                onChangeOrigemTexto={handleChangeOrigemTexto}
+                onChangeDestinoTexto={handleChangeDestinoTexto}
+                onSelecionarOrigem={handleSelecionarOrigem}
+                onSelecionarDestino={handleSelecionarDestino}
+                onLimparOrigem={() => {
+                  setOrigemTexto('');
+                  setOrigemLocal(null);
+                }}
+                onLimparDestino={() => {
+                  setDestinoTexto('');
+                  setDestinoLocal(null);
+                }}
+                onInverter={inverterTrajeto}
+                onFechar={fecharBusca}
+                onPesquisar={handlePesquisarRotas}
+                onUsarLocalizacaoAtual={handleUsarLocalizacaoComoOrigem}
+                carregandoLocalizacao={carregandoLocalizacao}
+                carregandoRotas={carregandoRotas}
+                mensagemValidacao={mensagemValidacao}
+              />
+            </div>
+          )}
+
+          {/* Botão de voltar quando uma rota específica foi escolhida e NÃO em acompanhamento */}
+          {buscandoRota && rotaEscolhida && !modoAcompanhamento && (
+            <div className="p-4 max-w-md mx-auto w-full flex items-center justify-between">
               <button
-                onClick={() => setRespostaIAMensagem(null)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                onClick={() => setRotaEscolhida(null)}
+                className="w-11 h-11 rounded-2xl bg-[#05053a] text-lime-300 flex items-center justify-center shadow-xl cursor-pointer active:scale-95 transition-transform"
+                title="Voltar para opções de rotas"
               >
-                <X className="w-4 h-4" />
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+
+              <button
+                onClick={fecharBusca}
+                className="px-4 py-2 rounded-full bg-white/90 text-[#05053a] text-xs font-bold shadow-md hover:bg-white active:scale-95 transition-all cursor-pointer border border-slate-200"
+              >
+                Nova busca
               </button>
             </div>
           )}
 
-          {/* Sugestões rápidas de locais conhecidos */}
-          <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none text-xs">
-            <span className="text-slate-500 font-semibold shrink-0">Atalhos:</span>
-            <button
-              onClick={() => selecionarAtalho('Shopping Recife', 'Marco Zero')}
-              className="px-3 py-1.5 rounded-full bg-white text-[#05053a] font-medium shadow-sm hover:shadow active:scale-95 transition-all shrink-0 cursor-pointer border border-slate-200"
-            >
-              Shopping Recife ➔ Marco Zero
-            </button>
-            <button
-              onClick={() => selecionarAtalho('Universidade Federal de Pernambuco', 'Derby, Recife')}
-              className="px-3 py-1.5 rounded-full bg-white text-[#05053a] font-medium shadow-sm hover:shadow active:scale-95 transition-all shrink-0 cursor-pointer border border-slate-200"
-            >
-              UFPE ➔ Derby
-            </button>
-            <button
-              onClick={() => selecionarAtalho('Afogados, Recife', 'Boa Viagem, Recife')}
-              className="px-3 py-1.5 rounded-full bg-white text-[#05053a] font-medium shadow-sm hover:shadow active:scale-95 transition-all shrink-0 cursor-pointer border border-slate-200"
-            >
-              Afogados ➔ Boa Viagem
-            </button>
-          </div>
-        </header>
-      )}
-
-      {/* 2. TOPO QUANDO ESTÁ BUSCANDO ROTA */}
-      {buscandoRota && !rotaEscolhida && (
-        <div className="flex flex-col">
-          <CardSeuTrajeto
-            origemTexto={origemTexto}
-            destinoTexto={destinoTexto}
-            origemLocal={origemLocal}
-            destinoLocal={destinoLocal}
-            onChangeOrigemTexto={handleChangeOrigemTexto}
-            onChangeDestinoTexto={handleChangeDestinoTexto}
-            onSelecionarOrigem={handleSelecionarOrigem}
-            onSelecionarDestino={handleSelecionarDestino}
-            onLimparOrigem={() => {
-              setOrigemTexto('');
-              setOrigemLocal(null);
-            }}
-            onLimparDestino={() => {
-              setDestinoTexto('');
-              setDestinoLocal(null);
-            }}
-            onInverter={inverterTrajeto}
-            onFechar={fecharBusca}
-            onPesquisar={handlePesquisarRotas}
-            carregandoRotas={carregandoRotas}
-            mensagemValidacao={mensagemValidacao}
-          />
-
-          {/* Feedback ou aviso da IA se houver */}
-          {respostaIAMensagem && (
-            <div className="w-full max-w-md mx-auto px-4 -mt-2 mb-2">
-              <div className="bg-white/95 backdrop-blur border border-indigo-100 shadow rounded-2xl p-3 text-xs text-[#05053a] flex items-center justify-between gap-2">
+          {/* Alerta de erro de localização se houver */}
+          {erroLocalizacao && (
+            <div className="w-full max-w-md mx-auto px-4 mt-2">
+              <div className="bg-amber-600 text-white shadow-lg rounded-2xl p-3 text-xs flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-lime-600 shrink-0" />
-                  <p className="font-medium">{respostaIAMensagem}</p>
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span className="font-medium">{erroLocalizacao}</span>
                 </div>
                 <button
-                  onClick={() => setRespostaIAMensagem(null)}
-                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                  onClick={limparErroLocalizacao}
+                  className="p-1 hover:opacity-80 cursor-pointer"
+                  title="Fechar"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -445,53 +575,47 @@ export function Home() {
             </div>
           )}
         </div>
-      )}
 
-      {/* Botão flutuante de voltar quando já escolheu uma rota */}
-      {buscandoRota && rotaEscolhida && (
-        <div className="relative z-20 w-full max-w-md mx-auto p-4">
-          <button
-            onClick={() => setRotaEscolhida(null)}
-            className="w-11 h-11 rounded-2xl bg-[#05053a] text-lime-300 flex items-center justify-center shadow-lg cursor-pointer active:scale-95 transition-transform"
-            title="Voltar para opções de rotas"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
+        {/* BASE: LISTA DE SUGESTÕES OU DETALHES OU ACOMPANHAMENTO ATIVO */}
+        <div className="w-full pointer-events-auto">
+          {/* 1. MODO ACOMPANHAMENTO ATIVO */}
+          {modoAcompanhamento && rotaEscolhida && (
+            <CardAcompanhamento
+              rota={rotaEscolhida}
+              posicaoUsuario={posicaoUsuario}
+              statusRastreamento={statusRastreamento}
+              destinoNome={destinoTexto || 'Destino'}
+              destinoCoordenadas={pontoDestinoMapa}
+              onPausar={handlePausarAcompanhamento}
+              onRetomar={handleRetomarAcompanhamento}
+              onEncerrar={handleEncerrarAcompanhamento}
+              onCentralizar={handleCentralizarUsuario}
+              seguindoUsuario={seguindoUsuario}
+            />
+          )}
+
+          {/* 2. LISTA DE SUGESTÕES DE ROTAS */}
+          {!modoAcompanhamento && buscandoRota && temCamposPreenchidos && !rotaEscolhida && (
+            <CardMaisRotas
+              rotas={rotas}
+              carregando={carregandoRotas}
+              mensagemErro={mensagemErro}
+              onSelecionarRota={(rota) => setRotaEscolhida(rota)}
+            />
+          )}
+
+          {/* 3. CARD DE ROTA SELECIONADA (com botão de Iniciar Acompanhamento) */}
+          {!modoAcompanhamento && buscandoRota && rotaEscolhida && (
+            <CardRotaSelecionada
+              rota={rotaEscolhida}
+              onVerMaisRotas={() => setRotaEscolhida(null)}
+              onCancelar={fecharBusca}
+              onIniciarAcompanhamento={handleIniciarAcompanhamento}
+            />
+          )}
         </div>
-      )}
 
-      {/* 3. PAINEL INFERIOR: LISTA DE ROTAS OU ROTA SELECIONADA */}
-      {buscandoRota && temCamposPreenchidos && !rotaEscolhida && (
-        <CardMaisRotas
-          rotas={rotas}
-          carregando={carregandoRotas}
-          mensagemErro={mensagemErro}
-          onSelecionarRota={(rota) => setRotaEscolhida(rota)}
-        />
-      )}
-
-      {buscandoRota && rotaEscolhida && (
-        <CardRotaSelecionada
-          rota={rotaEscolhida}
-          onVerMaisRotas={() => setRotaEscolhida(null)}
-          onCancelar={fecharBusca}
-        />
-      )}
-
-      {/* Estado neutro inicial */}
-      {!buscandoRota && (
-        <div className="relative z-0 flex-1 flex flex-col items-center justify-center px-6 text-center text-slate-400">
-          <div className="w-20 h-20 rounded-3xl bg-[#05053a]/5 flex items-center justify-center mb-3">
-            <Search className="w-9 h-9 text-[#05053a]/40" />
-          </div>
-          <p className="text-sm font-semibold text-[#05053a]/60">
-            Digite o nome dos locais para encontrar sua rota
-          </p>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs">
-            Ex: Shopping Recife, UFPE, Marco Zero, Afogados ou Boa Viagem.
-          </p>
-        </div>
-      )}
+      </div>
 
     </div>
   );

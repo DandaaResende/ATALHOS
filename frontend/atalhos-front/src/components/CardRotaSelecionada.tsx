@@ -4,12 +4,14 @@ interface CardRotaSelecionadaProps {
   rota: OpcaoRota;
   onVerMaisRotas: () => void;
   onCancelar: () => void;
+  onIniciarAcompanhamento?: (rota: OpcaoRota) => void;
 }
 
 export function CardRotaSelecionada({
   rota,
   onVerMaisRotas,
   onCancelar,
+  onIniciarAcompanhamento,
 }: CardRotaSelecionadaProps) {
   const trechos = rota.detalhes?.trechos || [];
 
@@ -107,10 +109,16 @@ export function CardRotaSelecionada({
             Mais tarde
           </button>
           <button
-            onClick={() => alert(`Acompanhando percurso da linha ${rota.linhas?.join(', ') || rota.via}`)}
-            className="flex-1 py-3.5 px-4 rounded-full bg-[#05053a] text-white font-semibold text-sm leading-tight hover:bg-[#08085a] transition-all cursor-pointer active:scale-95 shadow-md"
+            onClick={() => {
+              if (onIniciarAcompanhamento) {
+                onIniciarAcompanhamento(rota);
+              } else {
+                alert(`Acompanhando percurso da linha ${rota.linhas?.join(', ') || rota.via}`);
+              }
+            }}
+            className="flex-1 py-3.5 px-4 rounded-full bg-[#05053a] text-white font-semibold text-sm leading-tight hover:bg-[#08085a] transition-all cursor-pointer active:scale-95 shadow-md flex items-center justify-center text-center"
           >
-            Acompanhar<br />Percurso
+            Iniciar<br />Acompanhamento
           </button>
         </div>
       </div>
