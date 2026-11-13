@@ -429,13 +429,7 @@ def _montar_trecho(
         })
 
     shape_id = viagem.get("shape_id")
-    coordenadas = [
-        {
-            "latitude": ponto["latitude"],
-            "longitude": ponto["longitude"],
-        }
-        for ponto in dados["shapes"].get(shape_id, [])
-    ]
+    coordenadas = dados["shapes"].get(shape_id, [])
 
     return {
         "linha": linha.get("route_short_name", ""),
