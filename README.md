@@ -1,135 +1,243 @@
-# 🚌 Atalhos - O aplicativo que encurta seu percurso
+# 🚌 Atalhos — O aplicativo que encurta seu percurso
 
-**Atalhos** é uma plataforma inteligente de mobilidade urbana que utiliza agentes de Inteligência Artificial para ajudar passageiros a planejar seus deslocamentos no transporte público.
+> **Mais do que indicar caminhos, queremos ajudar cada passageiro a decidir com previsibilidade como chegar ao seu destino.**
 
-> **Mais do que indicar caminhos, queremos ajudar cada passageiro a decidir como chegar ao seu destino.**
+O **Atalhos** é uma plataforma inteligente de mobilidade urbana voltada ao transporte público coletivo (inicialmente na Região Metropolitana do Recife). O sistema combina um motor de rotas baseado em dados abertos no formato **GTFS**, integração com mapas interativos, rastreamento em tempo real por **GPS**, e um assistente conversacional movido a **Inteligência Artificial (Google Gemini)** para planejar trajetos, consultar horários e coletar avaliações colaborativas dos passageiros.
 
 ---
 
-## Objetivo do projeto
+## 📋 Sumário
 
-Tornar o transporte público mais acessível, previsível e fácil de utilizar, oferecendo informações contextualizadas e recomendações que consideram as necessidades individuais de cada passageiro.
+- [Visão Geral e Funcionalidades](#-visão-geral-e-funcionalidades)
+- [Tecnologias Utilizadas](#-tecnologias-utilizadas)
+- [Estrutura do Projeto](#-estrutura-do-projeto)
+- [Pré-requisitos](#-pré-requisitos)
+- [Como Rodar o Projeto](#-como-rodar-o-projeto)
+  - [1. Configurando e Rodando o Backend (Django)](#1-configurando-e-rodando-o-backend-django)
+  - [2. Configurando e Rodando o Frontend (React + Vite)](#2-configurando-e-rodando-o-frontend-react--vite)
+- [Endpoints Principais da API](#-endpoints-principais-da-api)
+- [Testes e Qualidade](#-testes-e-qualidade)
 
-## Principais funcionalidades
+---
 
-- **Planejamento inteligente de trajetos:** recomenda caminhos considerando as necessidades e preferências do passageiro.
-- **Interação por linguagem natural:** permite que o usuário faça solicitações de maneira simples e conversacional.
-- **Informações contextualizadas:** consulta uma base de conhecimento sobre linhas, itinerários e funcionamento do transporte público.
-- **Recomendações personalizadas:** avalia diferentes alternativas para indicar opções adequadas à realidade do usuário.
-- **Avaliações de veículos e motoristas:** permite registrar avaliações vinculadas ao número do veículo e à data e horário do percurso.
+## 🎯 Visão Geral e Funcionalidades
 
-## Inteligência Artificial
+### 1. Planejamento Inteligente de Trajetos
+- Sugestão de rotas **diretas** e **com integração** (baldeações entre linhas).
+- Cálculo de distâncias de caminhada inicial, transbordo e final.
+- Apresentação de horários estimados de saída e chegada, paradas intermediárias e tempo total de percurso.
 
-A solução utiliza uma arquitetura **multi-agente**, na qual diferentes agentes especializados colaboram para interpretar solicitações, consultar informações e avaliar alternativas de deslocamento.
+### 2. Assistente Conversacional com IA (Google Gemini)
+- O usuário pode digitar perguntas em linguagem natural (ex.: *"Como vou do Shopping Recife ao Derby após as 18h?"*).
+- O agente interpreta intenção, origem, destino, preferências e horários, acionando a busca de rotas diretamente.
 
+### 3. Mapa Interativo e Navegação em Tempo Real
+- Mapa com OpenStreetMap e Leaflet.
+- Rastreamento da localização do usuário com indicador de direção (*heading*) e bússola.
+- Traçado colorido com halo destacando exatamente o trecho a bordo do ônibus e linhas tracejadas para caminhadas.
+- Modo de acompanhamento ativo com centralização automática (*auto-follow*).
 
-### Fluxo de funcionamento do agente de IA
+### 4. Pins de Paradas de Ônibus Interativas (Tela do Ponto)
+- Visualização de paradas de ônibus diretamente no mapa com marcadores estilizados.
+- Ao clicar no pin ou no atalho rápido, abre a **Tela do Ponto de Ônibus**:
+  - Distância e tempo de caminhada estimados em relação à posição do usuário via GPS.
+  - Botão de favoritar parada.
+  - Lista de ônibus previstos com número da linha, itinerário e tempo restante em minutos.
+  - Indicadores visuais de acessibilidade para cadeirantes ♿ e ar-condicionado ❄️.
 
-O agente do Atalhos recebe solicitações em linguagem natural, identifica as necessidades do passageiro, consulta informações sobre o transporte público e apresenta recomendações personalizadas.
+### 5. Avaliação Colaborativa de Ônibus (Tela do Ônibus)
+- Ao clicar no botão de informações `(i)` de uma linha na parada, abre a tela de feedback:
+  - Confirmação de pontualidade (*Sim*, *Não*, *Não sei*).
+  - Nível de lotação (*Cheio*, *Moderado*, *Vazio*, *Não sei*).
+  - Campo de observação aberta sobre motorista, conservação e trajeto.
+  - Persistência e confirmação de envio para retroalimentar a comunidade.
 
-<details>
-<summary>Inputs (Entradas)</summary>
+---
 
-Informações fornecidas pelo usuário:
+## 🛠️ Tecnologias Utilizadas
 
-- Origem e destino.
-- Horário desejado.
-- Preferências de deslocamento.
-- Necessidades específicas de mobilidade.
-
-</details>
-
-<details>
-<summary>Processamento (Lógica)</summary>
-
-1. **Interpretação:** identifica as informações e intenções da solicitação.
-2. **Validação:** verifica se existem dados suficientes para planejar o trajeto.
-3. **Consulta:** utiliza ferramentas e RAG para recuperar informações sobre linhas, paradas e itinerários.
-4. **Análise:** compara as alternativas encontradas considerando as preferências do usuário.
-5. **Recomendação:** seleciona as opções mais adequadas.
-6. **Resposta:** apresenta os resultados em linguagem natural.
-
-</details>
-
-<details>
-<summary>Outputs (Saídas)</summary>
-
-Informações apresentadas ao passageiro:
-
-- Alternativas de trajetos.
-- Linhas e paradas recomendadas.
-- Sequência de deslocamento.
-- Tempo estimado de viagem, quando disponível.
-- Quantidade de baldeações.
-- Justificativa da recomendação.
-
-</details>
-
-### 📊 Diagrama do fluxo
-
-```mermaid
-flowchart TD
-    A[Solicitação do usuário] --> B[Interpretação da intenção]
-    B --> C{Dados suficientes?}
-    C -- Não --> D[Solicitar informações adicionais]
-    D --> A
-    C -- Sim --> E[Consultar base de conhecimento]
-    E --> F[Analisar alternativas]
-    F --> G[Comparar com preferências]
-    G --> H[Selecionar recomendações]
-    H --> I[Apresentar resposta]
-```
-
-
-## tecnologias utilizadas
-
-| Tecnologia | Aplicação |
+### Backend
+| Tecnologia | Finalidade |
 |---|---|
-| **Gemini** | Modelo de linguagem responsável pela interpretação de solicitações e geração de respostas. |
-| **Groq** | Plataforma de inferência utilizada para executar modelos de linguagem com baixa latência. |
-| **RAG** | Técnica que permite consultar uma base de conhecimento antes de gerar respostas, fornecendo informações mais contextualizadas. |
-| **Python** | Desenvolvimento e integração das funcionalidades de IA e processamento de dados. |
-| **API** | Comunicação entre frontend e backend, possibilitando o envio e recebimento de informações. |
+| **Python 3.12+** | Linguagem principal do backend |
+| **Django 5.2** | Framework web robusto e estruturado |
+| **Django REST Framework** | Criação de APIs RESTful e serialização |
+| **Google Gemini API (`google-genai`)** | Modelo de linguagem para o assistente conversacional |
+| **GTFS (General Transit Feed Specification)** | Leitura e processamento de dados reais de linhas, viagens, horários e paradas |
+| **Nominatim / OpenStreetMap** | Geocodificação e autocomplete de endereços e pontos de interesse |
+| **SQLite** | Banco de dados padrão leve para persistência |
 
+### Frontend
+| Tecnologia | Finalidade |
+|---|---|
+| **React 19** | Biblioteca para construção da interface de usuário |
+| **TypeScript** | Tipagem estática e segurança no desenvolvimento |
+| **Vite** | Bundler e ambiente de desenvolvimento ultrarrápido |
+| **Tailwind CSS v4** | Estilização moderna através de utility classes |
+| **Leaflet & @types/leaflet** | Renderização e manipulação do mapa interativo |
+| **Lucide React** | Pacote de ícones SVG limpos e consistentes |
+| **React Router v7** | Roteamento declarativo de páginas |
 
-## Visão geral da arquitetura
+---
+
+## 📂 Estrutura do Projeto
 
 ```text
-              ┌──────────────────┐
-              │    FRONTEND      │
-              │ React + TS       │
-              └────────┬─────────┘
-                       │
-                       ▼
-              ┌──────────────────┐
-              │    BACKEND       │
-              │   TypeScript     │
-              └────────┬─────────┘
-                       │
-              ┌────────┴─────────┐
-              ▼                  ▼
-      ┌──────────────┐   ┌──────────────┐
-      │  Agentes IA  │   │  Banco de    │
-      │ Python       │   │  Dados       │
-      │ Gemini/Groq  │   │ PostgreSQL   │
-      │ RAG          │   │ SQLite       │
-      └──────────────┘   └──────────────┘
+ATALHOS/
+├── backend/
+│   ├── config/             # Configurações do projeto Django (settings, urls, asgi, wsgi)
+│   ├── dados/
+│   │   └── gtfs/           # Arquivos de dados abertos do transporte público (stops, routes, trips, shapes...)
+│   ├── ia/                 # Aplicativo de Inteligência Artificial (prompts, services, views)
+│   ├── rotas/              # Aplicativo de cálculo de rotas, itinerários e GTFS
+│   ├── db.sqlite3          # Banco de dados SQLite local
+│   └── manage.py           # Utilitário CLI do Django
+│
+├── frontend/
+│   └── atalhos-front/
+│       ├── src/
+│       │   ├── assets/     # Imagens e vetores estáticos
+│       │   ├── components/ # Componentes (MapaInterativo, CardPontoOnibus, CardAvaliacaoOnibus, etc.)
+│       │   ├── hooks/      # Hooks customizados (useGeolocalizacao)
+│       │   ├── pages/      # Telas (Home, Login, Cadastro, Perfil)
+│       │   ├── services/   # Integração com APIs e armazenamento (api.ts, paradasService.ts)
+│       │   ├── types/      # Definições TypeScript (parada.ts, ia.ts)
+│       │   └── utils/      # Funções utilitárias (geo.ts - Haversine)
+│       ├── package.json    # Dependências e scripts do frontend
+│       └── vite.config.ts  # Configuração do Vite com proxy para o backend
+│
+├── .env.example            # Exemplo das variáveis de ambiente necessárias
+├── requirements.txt        # Dependências Python do backend
+└── README.md               # Este documento
 ```
 
-## Impacto esperado
+---
 
-- Maior autonomia para os passageiros.
-- Mais previsibilidade nos deslocamentos.
-- Facilidade de acesso às informações do transporte público.
-- Recomendações mais adequadas às necessidades individuais.
-- Melhoria na experiência de utilização do transporte coletivo.
+## ⚙️ Pré-requisitos
+
+Antes de iniciar, certifique-se de ter instalado em sua máquina:
+- **Python 3.12** ou superior (verifique com `python --version`)
+- **Node.js 18** ou superior e gerenciador de pacotes **npm** (verifique com `node -v` e `npm -v`)
+- **Git** para clonar o repositório
+- Uma chave de API do **Google Gemini** ([obtenha gratuitamente no Google AI Studio](https://aistudio.google.com/))
 
 ---
 
-## 📌 Status do projeto
+## 🚀 Como Rodar o Projeto
 
-🚧 Em desenvolvimento.
+### 1. Configurando e Rodando o Backend (Django)
+
+1. **Abra o terminal** e navegue até a raiz do repositório:
+   ```bash
+   cd c:\Users\Heloi\Documents\projetos\ATALHOS
+   ```
+
+2. **Crie e ative um ambiente virtual:**
+   - No Windows (PowerShell):
+     ```powershell
+     python -m venv .venv
+     .\.venv\Scripts\Activate.ps1
+     ```
+   - No Linux/macOS:
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     ```
+
+3. **Instale as dependências do Python:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure as variáveis de ambiente:**
+   Crie um arquivo `.env` na raiz do projeto (ou dentro da pasta `backend/`) copiando o modelo de `.env.example`:
+   ```bash
+   cp .env.example .env
+   ```
+   Abra o arquivo `.env` e preencha suas variáveis:
+   ```env
+   SECRET_KEY=sua-chave-secreta-django
+   DEBUG=True
+   ALLOWED_HOSTS=localhost,127.0.0.1
+   GEMINI_API_KEY=sua-chave-api-gemini-aqui
+   ```
+
+5. **Execute as migrações do banco de dados:**
+   ```bash
+   python backend/manage.py migrate
+   ```
+
+6. **Inicie o servidor de desenvolvimento do Django:**
+   ```bash
+   python backend/manage.py runserver 8000
+   ```
+   O backend estará acessível em `http://127.0.0.1:8000/`.
 
 ---
 
-**Atalhos — Menos incerteza, mais caminhos.** 🚌
+### 2. Configurando e Rodando o Frontend (React + Vite)
+
+Em uma **nova janela do terminal**:
+
+1. **Navegue até a pasta do frontend:**
+   ```bash
+   cd c:\Users\Heloi\Documents\projetos\ATALHOS\frontend\atalhos-front
+   ```
+
+2. **Instale as dependências do Node.js:**
+   ```bash
+   npm install
+   ```
+
+3. **Inicie o servidor de desenvolvimento do Vite:**
+   ```bash
+   npm run dev
+   ```
+
+4. **Acesse no navegador:**
+   Abra o endereço indicado pelo Vite, normalmente:
+   ```text
+   http://localhost:5173/
+   ```
+
+> 💡 **Nota sobre Comunicação:** O Vite já está configurado via `vite.config.ts` com **proxy automático** para redirecionar chamadas iniciadas em `/rotas` e `/api` diretamente para `http://127.0.0.1:8000`, evitando qualquer problema de CORS em ambiente de desenvolvimento local.
+
+---
+
+## 📡 Endpoints Principais da API
+
+| Método | Endpoint | Descrição |
+|---|---|---|
+| `GET` | `/rotas/buscar/?origem=...&destino=...` | Busca de rotas com base em nomes ou coordenadas (`origem_latitude`, `origem_longitude`, etc.) |
+| `GET` | `/rotas/api/locais/sugestoes/?q=...` | Autocomplete de locais e bairros usando Nominatim |
+| `GET` | `/rotas/api/linhas/<codigo>/itinerario/` | Retorna o itinerário e paradas completas de uma linha |
+| `GET` | `/rotas/api/paradas/` | Lista todas as paradas cadastradas no GTFS |
+| `POST` | `/api/ia/consultar/` | Envia mensagem em linguagem natural e retorna intenção, origem e destino inferidos pelo Gemini |
+
+---
+
+## 🧪 Testes e Qualidade
+
+- **Executar testes do módulo de IA:**
+  ```bash
+  python backend/manage.py test ia
+  ```
+- **Executar testes do módulo de Rotas:**
+  ```bash
+  python backend/manage.py test rotas
+  ```
+- **Verificar integridade do Django:**
+  ```bash
+  python backend/manage.py check
+  ```
+- **Testar build do Frontend:**
+  ```bash
+  cd frontend/atalhos-front
+  npm run build
+  ```
+
+---
+
+<div align="center">
+  <sub>Desenvolvido com foco em acessibilidade e inovação na mobilidade urbana.</sub>
+</div>
