@@ -6,4 +6,5 @@ urlpatterns = [
     path('api/linhas/<str:codigo>/itinerario/', views.api_itinerario, name='api_itinerario'),
     path('', views.pagina_mapa, name='pagina_mapa'),
     path('api/paradas/', views.api_todas_paradas, name='api_todas_paradas'),
+    path('api/locais/sugestoes/', views.api_sugestoes_locais, name='api_sugestoes_locais'),
 ]

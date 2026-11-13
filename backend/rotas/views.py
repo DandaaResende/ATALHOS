@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from .services import buscar_coordenadas
+from .services import buscar_coordenadas, buscar_sugestoes_locais
 from .gtfs import (
     ErroGTFS,
     buscar_itinerario,
@@ -186,3 +186,19 @@ def api_todas_paradas(request):
         return JsonResponse({"paradas": paradas})
     except ErroGTFS as erro:
         return JsonResponse({"erro": str(erro)}, status=503)
+
+
+@require_GET
+def api_sugestoes_locais(request):
+    """
+    Retorna sugestões de locais correspondentes ao texto digitado pelo usuário.
+    Aceita o parâmetro GET 'q' (termo de pesquisa).
+    """
+    termo = request.GET.get("q", "").strip()
+
+    if len(termo) < 2:
+        return JsonResponse({"sugestoes": []})
+
+    sugestoes = buscar_sugestoes_locais(termo)
+    return JsonResponse({"sugestoes": sugestoes})
+

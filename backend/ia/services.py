@@ -97,6 +97,31 @@ def _montar_conteudos(mensagem, historico=None):
     return conteudos
 
 
+def _extrair_json(texto):
+    """
+    Decodifica o objeto JSON a partir da resposta do modelo,
+    removendo marcações de código markdown (```json ... ```) se existirem.
+    """
+    if texto is None or not str(texto).strip():
+        raise json.JSONDecodeError("Resposta vazia recebida do assistente.", "", 0)
+
+    texto_limpo = str(texto).strip()
+    if texto_limpo.startswith("```json"):
+        texto_limpo = texto_limpo[7:]
+    elif texto_limpo.startswith("```"):
+        texto_limpo = texto_limpo[3:]
+    if texto_limpo.endswith("```"):
+        texto_limpo = texto_limpo[:-3]
+    texto_limpo = texto_limpo.strip()
+
+    inicio = texto_limpo.find("{")
+    fim = texto_limpo.rfind("}")
+    if inicio != -1 and fim != -1 and fim >= inicio:
+        texto_limpo = texto_limpo[inicio : fim + 1]
+
+    return json.loads(texto_limpo)
+
+
 def interpretar_mensagem(mensagem, historico=None):
     """
     Envia a mensagem do usuário (e o histórico de mensagens, se houver) ao Gemini
@@ -121,4 +146,4 @@ def interpretar_mensagem(mensagem, historico=None):
         ),
     )
 
-    return json.loads(resposta.text)
+    return _extrair_json(resposta.text)

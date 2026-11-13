@@ -4,6 +4,10 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
+from .rotas_service import (
+    consultar_linha as consultar_linha_rota,
+    consultar_viagens,
+)
 from .serializers import RespostaAgenteSerializer
 from .services import interpretar_mensagem
 
@@ -92,7 +96,39 @@ def consultar_agente(request):
                 status=status.HTTP_502_BAD_GATEWAY
             )
 
-        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+        dados_agente = dict(serializer.validated_data)
+        resultado_consulta = None
+        intencao = dados_agente["intencao"]
+
+        if intencao == "buscar_rota":
+            origem = dados_agente.get("origem")
+            destino = dados_agente.get("destino")
+            informacoes_faltantes = dados_agente.get(
+                "informacoes_faltantes",
+                [],
+            )
+
+            if (
+                origem
+                and destino
+                and "origem" not in informacoes_faltantes
+                and "destino" not in informacoes_faltantes
+            ):
+                resultado_consulta = consultar_viagens(
+                    origem=origem,
+                    destino=destino,
+                    data=dados_agente.get("data"),
+                    horario=dados_agente.get("horario"),
+                    preferencias=dados_agente.get("preferencias"),
+                )
+
+        elif intencao == "consultar_linha":
+            codigo_linha = dados_agente.get("preferencias", {}).get("linha")
+            if codigo_linha:
+                resultado_consulta = consultar_linha_rota(codigo_linha)
+
+        dados_agente["resultado"] = resultado_consulta
+        return Response(dados_agente, status=status.HTTP_200_OK)
 
     except Exception:
         return Response(
